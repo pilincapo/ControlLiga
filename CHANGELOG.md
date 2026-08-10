@@ -2,6 +2,22 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.7.0] - 2026-08-10
+
+### Agregado
+
+- **FASE 7 — Partidos** (diseño aprobado en `docs/fase-7-diseno-partidos.md`).
+- Schema: `Partido.publicada` (visibilidad manual) y `Partido.arbitro` (texto libre, sin modelo de árbitros).
+- Backend: CRUD de partidos (crear OFICIAL con validación de torneo/temporada/participaciones, AMISTOSO independiente), máquina de estados (`PROGRAMADO → EN_CURSO/SUSPENDIDO/APLAZADO → ... → FINALIZADO`), carga de resultado (goles ≥ 0; desde EN_CURSO transiciona a FINALIZADO automáticamente), modificación solo en PROGRAMADO/APLAZADO, publicar/despublicar, listados por equipo y por usuario, endpoint público solo publicados.
+- Validaciones: equipos distintos, OFICIAL requiere torneoId+temporadaId y `EquipoParticipacion` CONFIRMADO, `torneoCategoria/zona/jornada` deben pertenecer a la temporada, transiciones auditadas.
+- Permisos: DELEGADO/TECNICO gestionan partidos donde su equipo es responsable; ADMIN del torneo gestiona OFICIALES; JUGADOR/AUXILIAR ven; PÚBLICO solo publicados.
+- No DELETE físico: cancelación = `SUSPENDIDO`. Sin fixture automático ni tabla de posiciones (FASE 8).
+- Respeto de FASE 5: `FormacionInstancia` no se modifica al cerrar el partido; se lista en el detalle.
+- Respeto de FASE 6: `Convocatoria` asociada se lista en el detalle del partido; no se altera.
+- Frontend: `/partidos` (listar + crear) y `/partidos/:id` (detalle, resultado, estado, formaciones, convocatorias).
+- Tests: 17 tests de partidos (crear, OFICIAL/independiente, validaciones, máquina de estados, resultado, permisos, público, auditoría). Total API: 152.
+- Migración `fase7_partidos` aplicada y cliente Prisma regenerado.
+
 ## [0.6.0] - 2026-08-10
 
 ### Agregado

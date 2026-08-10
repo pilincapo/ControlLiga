@@ -556,6 +556,8 @@ model Partido {
   fechaHora           DateTime
   lugar               String?
   estado              EstadoPartido    @default(PROGRAMADO)
+  publicada           Boolean          @default(false)
+  arbitro             String?
   golesLocal          Int?
   golesVisitante      Int?
   observaciones       String?

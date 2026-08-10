@@ -14,6 +14,8 @@ import FormacionesPage from './pages/formaciones/FormacionesPage'
 import FormacionPage from './pages/formaciones/FormacionPage'
 import ConvocatoriasPage from './pages/convocatorias/ConvocatoriasPage'
 import ConvocatoriaPage from './pages/convocatorias/ConvocatoriaPage'
+import PartidosPage from './pages/partidos/PartidosPage'
+import PartidoPage from './pages/partidos/PartidoPage'
 import './index.css'
 
 function App() {
@@ -125,6 +127,8 @@ function App() {
               </RequireAuth>
             }
           />
+          <Route path="/partidos" element={<RequireAuth><PartidosPage /></RequireAuth>} />
+          <Route path="/partidos/:id" element={<RequireAuth><PartidoPage /></RequireAuth>} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

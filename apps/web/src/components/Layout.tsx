@@ -15,6 +15,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <Link to="/equipos">Equipos</Link>
         <Link to="/formaciones">Formaciones</Link>
         <Link to="/convocatorias">Convocatorias</Link>
+        <Link to="/partidos">Partidos</Link>
         <Link to="/profile">Perfil</Link>
         {nombre && <span>{nombre}</span>}
         <button className="boton" onClick={() => void logout()}>
