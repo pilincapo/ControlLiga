@@ -11,6 +11,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <nav className="navbar">
         <span className="marca">CONTROL LIGA</span>
         <Link to="/dashboard">Dashboard</Link>
+        <Link to="/torneos">Torneos</Link>
         <Link to="/profile">Perfil</Link>
         {nombre && <span>{nombre}</span>}
         <button className="boton" onClick={() => void logout()}>

@@ -5,6 +5,8 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
+import TorneosPage from './pages/torneos/TorneosPage'
+import TorneoDetailPage from './pages/torneos/TorneoDetailPage'
 import './index.css'
 
 function App() {
@@ -41,6 +43,22 @@ function App() {
             element={
               <RequireAuth>
                 <ProfilePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/torneos"
+            element={
+              <RequireAuth>
+                <TorneosPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/torneos/:id"
+            element={
+              <RequireAuth>
+                <TorneoDetailPage />
               </RequireAuth>
             }
           />

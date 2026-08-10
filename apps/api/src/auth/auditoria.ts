@@ -1,5 +1,4 @@
 import type { AccionAuditoria, Prisma } from '../generated/prisma/client.js'
-import type { PrismaClient } from '../generated/prisma/client.js'
 
 interface AuditoriaEntrada {
   entidad: string
@@ -9,7 +8,7 @@ interface AuditoriaEntrada {
   cambios?: Prisma.InputJsonValue
 }
 
-export async function auditar(prisma: PrismaClient, entrada: AuditoriaEntrada): Promise<void> {
+export async function auditar(prisma: Prisma.TransactionClient, entrada: AuditoriaEntrada): Promise<void> {
   await prisma.auditoriaLog.create({
     data: {
       entidad: entrada.entidad,

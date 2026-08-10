@@ -2,6 +2,22 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.3.0] - 2026-08-10
+
+### Agregado
+
+- **FASE 3 — Módulo de torneos** (diseño aprobado en `docs/fase-3-diseno-torneos.md`).
+- Schema: `Torneo` con `estado` (`BORRADOR/INSCRIPCIONES/ACTIVO/FINALIZADO/ARCHIVADO`, reemplaza `activo`), `logoUrl`, `reglas`, `configuracionPublica`; `organizacionId` obligatorio. Enums `FormatoCompetencia` (8 formatos) y `EstadoJornada`.
+- `ConfiguracionCompetencia` (1:1 con `TorneoCategoria`): formato, config de formato, sistema de puntos y desempates en JSON tipado, validado con esquemas en `@controlliga/shared` (default 3/1/0 y `[PUNTOS, DIFERENCIA_GOLES, GOLES_FAVOR]`).
+- `EquipoParticipacion`: estados `PENDIENTE`/`RECHAZADO` + `fechaBaja` + `invitadoPorId`. Se eliminó la unicidad estricta; regla de integridad documentada (una participación activa por equipo/torneo/temporada) implementada transaccionalmente en backend, permitiendo reinscripción tras baja sin perder historial.
+- `JugadorParticipacion` (plantilla de jugador por competición con historial), `Jornada` y `JornadaEquipoDescanso` (preparan el fixture futuro); `Partido.jornadaId` opcional; `Zona` sin `torneoId` redundante.
+- Migración `fase3_torneos` aplicada y cliente Prisma regenerado.
+- Backend: CRUD y flujos de torneos (crear/consultar/modificar/estado), temporadas (crear/publicar/finalizar/cancelar), categorías (asociar + configuración), zonas (crear/modificar/asignar equipos), participaciones (invitar/solicitar/aceptar/rechazar/baja/asignar categoría y zona) y jugadores en competición (agregar/dorsal/baja/historial).
+- Máquina de estados para torneo y temporada con transiciones validadas y auditadas.
+- Permisos nuevos en shared: `torneos:ver`, `equipos:inscribir`, `partidos:cargarResultados`, `sanciones:gestionar`, `estadisticas:ver`. Alcance: ADMIN solo su organización; DELEGADO_TECNICO limitado a sus equipos.
+- Frontend: panel de torneos (`/torneos` y `/torneos/:id`) con secciones resumen, configuración, temporadas, categorías, zonas, equipos, jugadores y configuración pública; enlace desde dashboard.
+- Tests: 40 tests de backend del módulo de torneos (torneo, temporada, categorías/configuración, zonas, participaciones, jugadores, seguridad y unicidad). Total API: 71.
+
 ## [0.2.0] - 2026-08-10
 
 ### Agregado

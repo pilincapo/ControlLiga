@@ -30,14 +30,42 @@ enum EstadoTemporada {
   CANCELADO
 }
 
+enum EstadoTorneo {
+  BORRADOR
+  INSCRIPCIONES
+  ACTIVO
+  FINALIZADO
+  ARCHIVADO
+}
+
+enum FormatoCompetencia {
+  TODOS_CONTRA_TODOS
+  UNA_RUEDA
+  DOS_RUEDAS
+  FASE_DE_GRUPOS
+  GRUPOS_PLAYOFFS
+  ELIMINACION_DIRECTA
+  LIGA_FASE_FINAL
+  FASE_REGULAR_PLAYOFFS
+}
+
+enum EstadoJornada {
+  PENDIENTE
+  EN_CURSO
+  FINALIZADA
+  CANCELADA
+}
+
 enum EstadoTorneoCategoria {
   ACTIVA
   CERRADA
 }
 
 enum EstadoParticipacion {
+  PENDIENTE
   INSCRIPTO
   CONFIRMADO
+  RECHAZADO
   BAJA
 }
 
@@ -137,6 +165,7 @@ model Usuario {
   movimientosCajaCreados MovimientoCaja[] @relation("CajaCreador")
   auditoriaLogs          AuditoriaLog[]
   sesiones               Session[]
+  participacionesInvitadas EquipoParticipacion[] @relation("EquipoParticipacionInvitador")
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 
@@ -206,6 +235,7 @@ model Jugador {
   pesoKg           Decimal?         @db.Decimal(5, 2)
   usuario          Usuario?
   pertenencias     EquipoJugador[]
+  participaciones  JugadorParticipacion[]
   sanciones        Sancion[]
   movimientosCaja  MovimientoCaja[]
   createdAt        DateTime         @default(now())
@@ -238,6 +268,7 @@ model Equipo {
   movimientosCaja     MovimientoCaja[]
   sanciones           Sancion[]
   rolesUsuarios       RolUsuario[]
+  descansos           JornadaEquipoDescanso[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 
@@ -297,22 +328,24 @@ model Organizacion {
 }
 
 model Torneo {
-  id               String                @id @default(uuid()) @db.Uuid
-  organizacionId   String?               @db.Uuid
-  organizacion     Organizacion?         @relation(fields: [organizacionId], references: [id])
-  nombre           String
-  descripcion      String?
-  activo           Boolean               @default(true)
-  visiblePublico   Boolean               @default(false)
-  temporadas       Temporada[]
-  torneoCategorias TorneoCategoria[]
-  zonas            Zona[]
-  participaciones  EquipoParticipacion[]
-  partidos         Partido[]
-  sanciones        Sancion[]
-  rolesUsuarios    RolUsuario[]
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  id                   String                @id @default(uuid()) @db.Uuid
+  organizacionId       String                @db.Uuid
+  organizacion         Organizacion          @relation(fields: [organizacionId], references: [id])
+  nombre               String
+  descripcion          String?
+  logoUrl              String?
+  reglas               String?
+  estado               EstadoTorneo          @default(BORRADOR)
+  visiblePublico       Boolean               @default(false)
+  configuracionPublica Json?
+  temporadas           Temporada[]
+  torneoCategorias     TorneoCategoria[]
+  participaciones      EquipoParticipacion[]
+  partidos             Partido[]
+  sanciones            Sancion[]
+  rolesUsuarios        RolUsuario[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
   @@index([organizacionId])
   @@map("torneos")
@@ -360,6 +393,8 @@ model TorneoCategoria {
   participaciones EquipoParticipacion[]
   partidos        Partido[]
   sanciones       Sancion[]
+  jornadas        Jornada[]
+  configuracion   ConfiguracionCompetencia?
   createdAt       DateTime              @default(now())
 
   @@unique([torneoId, temporadaId, categoriaId])
@@ -375,9 +410,8 @@ model Zona {
   participaciones   EquipoParticipacion[]
   partidos          Partido[]
   sanciones         Sancion[]
+  jornadas          Jornada[]
   createdAt         DateTime              @default(now())
-  torneo            Torneo?               @relation(fields: [torneoId], references: [id])
-  torneoId          String?               @db.Uuid
 
   @@index([torneoCategoriaId])
   @@map("zonas")
@@ -397,14 +431,79 @@ model EquipoParticipacion {
   equipo            Equipo              @relation(fields: [equipoId], references: [id])
   estado            EstadoParticipacion @default(INSCRIPTO)
   fechaInscripcion  DateTime            @default(now())
+  fechaBaja         DateTime?
+  invitadoPorId     String?             @db.Uuid
+  invitadoPor       Usuario?            @relation("EquipoParticipacionInvitador", fields: [invitadoPorId], references: [id])
+  jugadores         JugadorParticipacion[]
   createdAt         DateTime            @default(now())
 
-  @@unique([equipoId, torneoId, temporadaId])
+  @@index([equipoId, torneoId, temporadaId])
   @@index([torneoId])
   @@index([temporadaId])
   @@index([torneoCategoriaId])
   @@index([zonaId])
   @@map("equipo_participacion")
+}
+
+model JugadorParticipacion {
+  id                    String               @id @default(uuid()) @db.Uuid
+  equipoParticipacionId String               @db.Uuid
+  equipoParticipacion   EquipoParticipacion  @relation(fields: [equipoParticipacionId], references: [id])
+  jugadorId             String               @db.Uuid
+  jugador               Jugador              @relation(fields: [jugadorId], references: [id])
+  dorsal                Int?
+  fechaAlta             DateTime             @default(now())
+  fechaBaja             DateTime?
+  activo                Boolean              @default(true)
+
+  @@unique([jugadorId, equipoParticipacionId])
+  @@index([equipoParticipacionId, activo])
+  @@map("jugador_participacion")
+}
+
+model ConfiguracionCompetencia {
+  id                   String               @id @default(uuid()) @db.Uuid
+  torneoCategoriaId    String               @unique @db.Uuid
+  torneoCategoria      TorneoCategoria      @relation(fields: [torneoCategoriaId], references: [id])
+  formato              FormatoCompetencia   @default(TODOS_CONTRA_TODOS)
+  configuracionFormato Json?
+  sistemaPuntos        Json                 @default("{\"victoria\":3,\"empate\":1,\"derrota\":0}")
+  desempates           Json                 @default("[\"PUNTOS\",\"DIFERENCIA_GOLES\",\"GOLES_FAVOR\"]")
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@map("configuracion_competencia")
+}
+
+model Jornada {
+  id                String                   @id @default(uuid()) @db.Uuid
+  torneoCategoriaId String                   @db.Uuid
+  torneoCategoria   TorneoCategoria          @relation(fields: [torneoCategoriaId], references: [id])
+  zonaId            String?                  @db.Uuid
+  zona              Zona?                    @relation(fields: [zonaId], references: [id])
+  numero            Int
+  nombre            String?
+  fechaInicio       DateTime?
+  estado            EstadoJornada            @default(PENDIENTE)
+  partidos          Partido[]
+  descansos         JornadaEquipoDescanso[]
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@index([torneoCategoriaId])
+  @@map("jornadas")
+}
+
+model JornadaEquipoDescanso {
+  id       String  @id @default(uuid()) @db.Uuid
+  jornadaId String @db.Uuid
+  jornada  Jornada @relation(fields: [jornadaId], references: [id])
+  equipoId String  @db.Uuid
+  equipo   Equipo  @relation(fields: [equipoId], references: [id])
+  motivo   String?
+
+  @@unique([jornadaId, equipoId])
+  @@map("jornada_equipo_descanso")
 }
 
 // ---------- PARTIDOS ----------
@@ -426,6 +525,8 @@ model Partido {
   equipoLocal         Equipo?          @relation("PartidoEquipoLocal", fields: [equipoLocalId], references: [id])
   equipoVisitanteId   String?          @db.Uuid
   equipoVisitante     Equipo?          @relation("PartidoEquipoVisitante", fields: [equipoVisitanteId], references: [id])
+  jornadaId           String?          @db.Uuid
+  jornada             Jornada?         @relation(fields: [jornadaId], references: [id])
   fechaHora           DateTime
   lugar               String?
   estado              EstadoPartido    @default(PROGRAMADO)
@@ -443,6 +544,7 @@ model Partido {
   @@index([torneoId])
   @@index([temporadaId])
   @@index([fechaHora])
+  @@index([jornadaId])
   @@index([equipoResponsableId, tipo])
   @@map("partidos")
 }

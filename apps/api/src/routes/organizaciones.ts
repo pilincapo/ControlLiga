@@ -13,7 +13,7 @@ export async function organizacionesRoutes(app: FastifyInstance): Promise<void> 
     }
     const organizacion = await getPrisma().organizacion.findUnique({
       where: { id },
-      include: { torneos: { select: { id: true, nombre: true, activo: true } } },
+      include: { torneos: { select: { id: true, nombre: true, estado: true } } },
     })
     if (!organizacion) {
       throw noEncontrado('Organización')

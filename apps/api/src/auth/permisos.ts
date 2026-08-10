@@ -31,6 +31,71 @@ export function esAdministradorTorneo(
   )
 }
 
+export async function esAdminDeTorneo(
+  prisma: PrismaClient,
+  contexto: ContextoAuth,
+  torneoId: string,
+): Promise<boolean> {
+  if (esSuperadmin(contexto)) {
+    return true
+  }
+  const torneo = await prisma.torneo.findUnique({
+    where: { id: torneoId },
+    select: { id: true, organizacionId: true },
+  })
+  if (!torneo) {
+    return false
+  }
+  return esAdministradorTorneo(contexto, torneo)
+}
+
+export async function puedeVerTorneo(
+  prisma: PrismaClient,
+  contexto: ContextoAuth,
+  torneoId: string,
+): Promise<boolean> {
+  if (esSuperadmin(contexto)) {
+    return true
+  }
+  const torneo = await prisma.torneo.findUnique({
+    where: { id: torneoId },
+    select: { id: true, organizacionId: true },
+  })
+  if (!torneo) {
+    return false
+  }
+  if (esAdministradorTorneo(contexto, torneo)) {
+    return true
+  }
+  if (!contexto.roles.some((r) => r.codigo === 'DELEGADO_TECNICO' || r.codigo === 'JUGADOR')) {
+    return false
+  }
+  const equipos = await prisma.equipoUsuario.findMany({
+    where: { usuarioId: contexto.usuarioId, activo: true },
+    select: { equipoId: true },
+  })
+  const equipoIds = new Set(equipos.map((e) => e.equipoId))
+  if (contexto.jugadorId) {
+    const pertenencias = await prisma.equipoJugador.findMany({
+      where: { jugadorId: contexto.jugadorId, activo: true },
+      select: { equipoId: true },
+    })
+    pertenencias.forEach((p) => equipoIds.add(p.equipoId))
+  }
+  if (equipoIds.size === 0) {
+    return false
+  }
+  const participacion = await prisma.equipoParticipacion.findFirst({
+    where: {
+      torneoId,
+      equipoId: { in: [...equipoIds] },
+      estado: { in: ['PENDIENTE', 'INSCRIPTO', 'CONFIRMADO'] },
+    },
+    select: { id: true },
+  })
+  return participacion !== null
+}
+
 export async function esMiembroEquipo(
   prisma: PrismaClient,
   contexto: ContextoAuth,

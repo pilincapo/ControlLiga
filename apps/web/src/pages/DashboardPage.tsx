@@ -2,16 +2,18 @@ import { useAuth } from '../auth/useAuth'
 import { PERMISOS, ROL_PUBLICO } from '@controlliga/shared'
 import type { Permiso } from '@controlliga/shared'
 import Layout from '../components/Layout'
+import { Link } from 'react-router-dom'
 
 interface Seccion {
   titulo: string
   permiso: Permiso | null
   detalle: string
+  enlace?: string
 }
 
 const SECCIONES: Seccion[] = [
   { titulo: 'Administración global', permiso: null, detalle: 'SUPERADMIN: control total del sistema' },
-  { titulo: 'Torneos', permiso: PERMISOS.torneosAdministrar, detalle: 'Crear y administrar torneos' },
+  { titulo: 'Torneos', permiso: PERMISOS.torneosVer, detalle: 'Crear y administrar torneos', enlace: '/torneos' },
   { titulo: 'Organizaciones', permiso: PERMISOS.organizacionesAdministrar, detalle: 'Administrar organizaciones' },
   { titulo: 'Mis equipos', permiso: PERMISOS.equiposVer, detalle: 'Equipos donde participás' },
   { titulo: 'Plantel', permiso: PERMISOS.jugadoresGestionar, detalle: 'Jugadores de tus equipos' },
@@ -46,7 +48,13 @@ export default function DashboardPage() {
           <div className="tarjeta" key={s.titulo}>
             <h3>{s.titulo}</h3>
             <p>{s.detalle}</p>
-            <span className="enlace">Próximamente</span>
+            {s.enlace ? (
+              <Link className="enlace" to={s.enlace}>
+                Abrir
+              </Link>
+            ) : (
+              <span className="enlace">Próximamente</span>
+            )}
           </div>
         ))}
       </div>

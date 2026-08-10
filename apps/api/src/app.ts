@@ -11,6 +11,12 @@ import { usuariosRoutes } from './routes/usuarios.js'
 import { equiposRoutes } from './routes/equipos.js'
 import { jugadoresRoutes } from './routes/jugadores.js'
 import { organizacionesRoutes } from './routes/organizaciones.js'
+import { torneosRoutes } from './routes/torneos.js'
+import { temporadasRoutes } from './routes/temporadas.js'
+import { torneoCategoriasRoutes } from './routes/torneo-categorias.js'
+import { zonasRoutes } from './routes/zonas.js'
+import { participacionesRoutes } from './routes/participaciones.js'
+import { jugadorParticipacionesRoutes } from './routes/jugador-participaciones.js'
 
 export function buildApp() {
   const app = Fastify({ logger: true })
@@ -49,6 +55,12 @@ export function buildApp() {
   app.register(equiposRoutes, { prefix: '/api' })
   app.register(jugadoresRoutes, { prefix: '/api' })
   app.register(organizacionesRoutes, { prefix: '/api' })
+  app.register(torneosRoutes, { prefix: '/api' })
+  app.register(temporadasRoutes, { prefix: '/api' })
+  app.register(torneoCategoriasRoutes, { prefix: '/api' })
+  app.register(zonasRoutes, { prefix: '/api' })
+  app.register(participacionesRoutes, { prefix: '/api' })
+  app.register(jugadorParticipacionesRoutes, { prefix: '/api' })
 
   return app
 }
