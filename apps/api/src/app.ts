@@ -10,6 +10,7 @@ import { authRoutes } from './routes/auth.js'
 import { usuariosRoutes } from './routes/usuarios.js'
 import { equiposRoutes } from './routes/equipos.js'
 import { jugadoresRoutes } from './routes/jugadores.js'
+import { equipoJugadoresRoutes } from './routes/equipo-jugadores.js'
 import { organizacionesRoutes } from './routes/organizaciones.js'
 import { torneosRoutes } from './routes/torneos.js'
 import { temporadasRoutes } from './routes/temporadas.js'
@@ -54,6 +55,7 @@ export function buildApp() {
   app.register(usuariosRoutes, { prefix: '/api' })
   app.register(equiposRoutes, { prefix: '/api' })
   app.register(jugadoresRoutes, { prefix: '/api' })
+  app.register(equipoJugadoresRoutes, { prefix: '/api' })
   app.register(organizacionesRoutes, { prefix: '/api' })
   app.register(torneosRoutes, { prefix: '/api' })
   app.register(temporadasRoutes, { prefix: '/api' })

@@ -7,7 +7,7 @@ import { autenticar, getAuth, requierePermiso } from '../plugins/auth.js'
 import { esAdminDeTorneo, esAdministradorOrganizacion, esSuperadmin, puedeVerTorneo } from '../auth/permisos.js'
 import { auditar } from '../auth/auditoria.js'
 import { transicionValidaTorneo } from '../torneos/estados.js'
-import { EstadoParticipacion } from '../generated/prisma/enums.js'
+import { EstadoParticipacion, EstadoEquipoJugador } from '../generated/prisma/enums.js'
 import type { Prisma } from '../generated/prisma/client.js'
 
 interface CrearTorneoBody {
@@ -60,7 +60,7 @@ export async function torneosRoutes(app: FastifyInstance): Promise<void> {
     eus.forEach((e) => equipoIds.add(e.equipoId))
     if (auth.jugadorId) {
       const ej = await prisma.equipoJugador.findMany({
-        where: { jugadorId: auth.jugadorId, activo: true },
+        where: { jugadorId: auth.jugadorId, estado: { not: EstadoEquipoJugador.BAJA } },
         select: { equipoId: true },
       })
       ej.forEach((e) => equipoIds.add(e.equipoId))

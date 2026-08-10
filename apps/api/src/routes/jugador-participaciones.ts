@@ -3,7 +3,7 @@ import { PERMISOS } from '@controlliga/shared'
 import { getPrisma } from '../db.js'
 import { badRequest, conflicto, noEncontrado, prohibido } from '../http.js'
 import { autenticar, getAuth, requierePermiso } from '../plugins/auth.js'
-import { esAdminDeTorneo, esMiembroEquipo, puedeVerTorneo } from '../auth/permisos.js'
+import { esAdminDeTorneo, esMiembroEquipo, puedeVerTorneo, ESTADOS_EQUIPOJUGADOR_CONFIRMADOS } from '../auth/permisos.js'
 import { auditar } from '../auth/auditoria.js'
 import type { ContextoAuth } from '../auth/contexto.js'
 import type { PrismaClient } from '../generated/prisma/client.js'
@@ -79,7 +79,7 @@ export async function jugadorParticipacionesRoutes(app: FastifyInstance): Promis
       throw noEncontrado('Jugador')
     }
     const pertenece = await prisma.equipoJugador.findFirst({
-      where: { jugadorId: body.jugadorId, equipoId: participacion.equipoId, activo: true },
+      where: { jugadorId: body.jugadorId, equipoId: participacion.equipoId, estado: { in: ESTADOS_EQUIPOJUGADOR_CONFIRMADOS } },
       select: { id: true },
     })
     if (!pertenece) {

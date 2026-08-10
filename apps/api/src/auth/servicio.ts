@@ -121,10 +121,12 @@ export async function registrarUsuario(datos: {
   nombre: string
   apellido: string
   jugadorId?: string
+  dni?: string
 }, request: FastifyRequest): Promise<SesionEmitida> {
   const email = datos.email.trim().toLowerCase()
   const nombre = datos.nombre.trim()
   const apellido = datos.apellido.trim()
+  const dni = datos.dni?.trim() || undefined
 
   if (!EMAIL_RE.test(email)) {
     throw badRequest('El email no es válido')
@@ -146,16 +148,37 @@ export async function registrarUsuario(datos: {
   }
 
   let jugadorId: string | undefined
+
   if (datos.jugadorId) {
-    const jugador = await prisma.jugador.findUnique({ where: { id: datos.jugadorId } })
+    const jugador = await prisma.jugador.findUnique({
+      where: { id: datos.jugadorId },
+      include: { persona: true },
+    })
     if (!jugador) {
       throw noEncontrado('Jugador')
+    }
+    const identidadCoincide =
+      (dni !== undefined && jugador.persona.dni !== null && jugador.persona.dni === dni) ||
+      (jugador.persona.email !== null && jugador.persona.email.toLowerCase() === email)
+    if (!identidadCoincide) {
+      throw badRequest('No se pudo verificar la identidad: el DNI o el email no coinciden con el jugador')
     }
     const vinculado = await prisma.usuario.findUnique({ where: { jugadorId: jugador.id } })
     if (vinculado) {
       throw conflicto('jugador_vinculado', 'Ese jugador ya está vinculado a otra cuenta')
     }
     jugadorId = jugador.id
+  } else if (dni !== undefined) {
+    const persona = await prisma.persona.findUnique({
+      where: { dni },
+      include: { jugador: true },
+    })
+    if (persona?.jugador) {
+      const vinculado = await prisma.usuario.findUnique({ where: { jugadorId: persona.jugador.id } })
+      if (!vinculado) {
+        jugadorId = persona.jugador.id
+      }
+    }
   }
 
   const rol = await prisma.rol.upsert({
@@ -240,14 +263,24 @@ export async function cerrarSesion(request: FastifyRequest): Promise<void> {
 export async function vincularJugador(
   contexto: ContextoAuth,
   jugadorId: string,
+  dni?: string,
 ): Promise<UsuarioSesionPayload> {
   if (contexto.jugadorId) {
     throw conflicto('ya_vinculado', 'Tu cuenta ya está vinculada a un jugador')
   }
   const prisma = getPrisma()
-  const jugador = await prisma.jugador.findUnique({ where: { id: jugadorId } })
+  const jugador = await prisma.jugador.findUnique({
+    where: { id: jugadorId },
+    include: { persona: true },
+  })
   if (!jugador) {
     throw noEncontrado('Jugador')
+  }
+  const identidadCoincide =
+    (dni !== undefined && dni.trim().length > 0 && jugador.persona.dni !== null && jugador.persona.dni === dni.trim()) ||
+    (jugador.persona.email !== null && jugador.persona.email.toLowerCase() === contexto.email.toLowerCase())
+  if (!identidadCoincide) {
+    throw badRequest('No se pudo verificar la identidad: el DNI o el email no coinciden con el jugador')
   }
   const vinculado = await prisma.usuario.findUnique({ where: { jugadorId } })
   if (vinculado) {

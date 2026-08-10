@@ -1,6 +1,15 @@
 import { ES_SUPERADMIN } from '@controlliga/shared'
+import type { RolEnEquipo } from '@controlliga/shared'
 import type { ContextoAuth } from './contexto.js'
 import type { PrismaClient } from '../generated/prisma/client.js'
+import { EstadoEquipoJugador } from '../generated/prisma/enums.js'
+
+export const ESTADOS_EQUIPOJUGADOR_CONFIRMADOS: EstadoEquipoJugador[] = [
+  EstadoEquipoJugador.ACTIVO,
+  EstadoEquipoJugador.INACTIVO,
+  EstadoEquipoJugador.LESIONADO,
+  EstadoEquipoJugador.SUSPENDIDO,
+]
 
 export function esSuperadmin(contexto: ContextoAuth): boolean {
   return ES_SUPERADMIN(contexto.roles)
@@ -77,7 +86,7 @@ export async function puedeVerTorneo(
   const equipoIds = new Set(equipos.map((e) => e.equipoId))
   if (contexto.jugadorId) {
     const pertenencias = await prisma.equipoJugador.findMany({
-      where: { jugadorId: contexto.jugadorId, activo: true },
+      where: { jugadorId: contexto.jugadorId, estado: { not: EstadoEquipoJugador.BAJA } },
       select: { equipoId: true },
     })
     pertenencias.forEach((p) => equipoIds.add(p.equipoId))
@@ -111,6 +120,22 @@ export async function esMiembroEquipo(
   return membresia !== null
 }
 
+export async function puedeEnEquipo(
+  prisma: PrismaClient,
+  contexto: ContextoAuth,
+  equipoId: string,
+  ...roles: RolEnEquipo[]
+): Promise<boolean> {
+  if (esSuperadmin(contexto)) {
+    return true
+  }
+  const membresia = await prisma.equipoUsuario.findFirst({
+    where: { usuarioId: contexto.usuarioId, equipoId, activo: true, rolEnEquipo: { in: roles } },
+    select: { id: true },
+  })
+  return membresia !== null
+}
+
 export function esElJugador(contexto: ContextoAuth, jugadorId: string): boolean {
   return contexto.jugadorId === jugadorId
 }
@@ -120,7 +145,7 @@ export async function equiposDelJugador(
   jugadorId: string,
 ): Promise<Array<{ equipoId: string }>> {
   const filas = await prisma.equipoJugador.findMany({
-    where: { jugadorId, activo: true },
+    where: { jugadorId, estado: { not: EstadoEquipoJugador.BAJA } },
     select: { equipoId: true },
   })
   return filas

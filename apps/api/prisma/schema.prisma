@@ -69,6 +69,21 @@ enum EstadoParticipacion {
   BAJA
 }
 
+enum EstadoEquipo {
+  ACTIVO
+  INACTIVO
+  ARCHIVADO
+}
+
+enum EstadoEquipoJugador {
+  ACTIVO
+  INACTIVO
+  LESIONADO
+  SUSPENDIDO
+  INVITADO
+  BAJA
+}
+
 enum TipoPartido {
   OFICIAL
   AMISTOSO
@@ -160,6 +175,7 @@ model Usuario {
   jugador                Jugador?         @relation(fields: [jugadorId], references: [id])
   roles                  RolUsuario[]
   equipos                EquipoUsuario[]
+  equiposInvitados       EquipoUsuario[]  @relation("EquipoUsuarioInvitador")
   equiposCreados         Equipo[]         @relation("EquipoCreador")
   convocatoriasCreadas   Convocatoria[]   @relation("ConvocatoriaCreador")
   movimientosCajaCreados MovimientoCaja[] @relation("CajaCreador")
@@ -254,7 +270,12 @@ model Equipo {
   descripcion         String?
   colorPrincipal      String?
   colorSecundario     String?
+  categoriaHabitual   String?
+  telefono            String?
+  email               String?
+  estado              EstadoEquipo          @default(ACTIVO)
   privado             Boolean               @default(true)
+  configuracionPublica Json?
   creadoPorId         String?               @db.Uuid
   creadoPor           Usuario?              @relation("EquipoCreador", fields: [creadoPorId], references: [id])
   usuarios            EquipoUsuario[]
@@ -284,6 +305,9 @@ model EquipoUsuario {
   usuario     Usuario     @relation(fields: [usuarioId], references: [id])
   rolEnEquipo RolEnEquipo
   activo      Boolean     @default(true)
+  invitadoPorId String?   @db.Uuid
+  invitadoPor   Usuario?  @relation("EquipoUsuarioInvitador", fields: [invitadoPorId], references: [id])
+  fechaBaja   DateTime?
   createdAt   DateTime    @default(now())
 
   @@index([equipoId, activo])
@@ -299,17 +323,18 @@ model EquipoJugador {
   jugador       Jugador               @relation(fields: [jugadorId], references: [id])
   dorsal        Int?
   posiciones    String?
+  estado        EstadoEquipoJugador   @default(ACTIVO)
   fechaIngreso  DateTime              @default(now())
   fechaSalida   DateTime?
-  activo        Boolean               @default(true)
   motivoBaja    String?
+  observaciones String?
   formaciones   FormacionJugador[]
   convocatorias ConvocatoriaJugador[]
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
 
-  @@index([equipoId, activo])
-  @@index([jugadorId, activo])
+  @@index([equipoId, estado])
+  @@index([jugadorId, estado])
   @@map("equipo_jugador")
 }
 

@@ -63,17 +63,31 @@ describe('autenticación', () => {
     expect(res.statusCode).toBe(400)
   })
 
-  it('registro con jugadorId vincula la cuenta', async () => {
-    const { jugador } = await crearPersonaJugador('Carlos', 'Vinculado')
+  it('registro con jugadorId vincula la cuenta (con identidad verificada por DNI)', async () => {
+    const { jugador } = await crearPersonaJugador('Carlos', 'Vinculado', { dni: '30000111' })
     const { res } = await registrar(app, {
       email: `vinculo-${Date.now()}@test.dev`,
       password: 'contraseña123',
       nombre: 'Carlos',
       apellido: 'Vinculado',
       jugadorId: jugador.id,
+      dni: '30000111',
     })
     expect(res.statusCode).toBe(201)
     expect(res.json().data.usuario.jugadorId).toBe(jugador.id)
+  })
+
+  it('registro con jugadorId ajeno y DNI que no coincide se rechaza', async () => {
+    const { jugador } = await crearPersonaJugador('Eva', 'Ajeno', { dni: '30000222' })
+    const { res } = await registrar(app, {
+      email: `ajeno-${Date.now()}@test.dev`,
+      password: 'contraseña123',
+      nombre: 'Eva',
+      apellido: 'Ajeno',
+      jugadorId: jugador.id,
+      dni: '99999999',
+    })
+    expect(res.statusCode).toBe(400)
   })
 
   it('login correcto: emite cookie de sesión', async () => {
@@ -166,8 +180,8 @@ describe('autenticación', () => {
     expect(res.statusCode).toBe(401)
   })
 
-  it('vinculación de jugador: se vincula la cuenta y queda auditado', async () => {
-    const { jugador } = await crearPersonaJugador('Daniela', 'Vinculo')
+  it('vinculación de jugador: se vincula la cuenta (con identidad verificada) y queda auditado', async () => {
+    const { jugador } = await crearPersonaJugador('Daniela', 'Vinculo', { dni: '30000333' })
     const email = `vincula2-${Date.now()}@test.dev`
     const { token } = await registrar(app, {
       email,
@@ -177,10 +191,18 @@ describe('autenticación', () => {
     })
     expect(token).toBeDefined()
 
-    const res = await app.inject({
+    const sinDni = await app.inject({
       method: 'POST',
       url: '/api/auth/me/vincular-jugador',
       payload: { jugadorId: jugador.id },
+      headers: conCookie(token!),
+    })
+    expect(sinDni.statusCode).toBe(400)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/me/vincular-jugador',
+      payload: { jugadorId: jugador.id, dni: '30000333' },
       headers: conCookie(token!),
     })
     expect(res.statusCode).toBe(200)
@@ -194,7 +216,7 @@ describe('autenticación', () => {
     const deNuevo = await app.inject({
       method: 'POST',
       url: '/api/auth/me/vincular-jugador',
-      payload: { jugadorId: jugador.id },
+      payload: { jugadorId: jugador.id, dni: '30000333' },
       headers: conCookie(token!),
     })
     expect(deNuevo.statusCode).toBe(409)

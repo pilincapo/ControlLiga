@@ -19,6 +19,7 @@ interface RegistroBody {
   nombre: string
   apellido: string
   jugadorId?: string
+  dni?: string
 }
 
 interface CredencialesBody {
@@ -28,6 +29,7 @@ interface CredencialesBody {
 
 interface VincularBody {
   jugadorId: string
+  dni?: string
 }
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
@@ -69,7 +71,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post('/auth/me/vincular-jugador', { preHandler: autenticar }, async (request) => {
     const auth = getAuth(request)
     const body = request.body as VincularBody
-    const usuario = await vincularJugador(auth, body.jugadorId)
+    const usuario = await vincularJugador(auth, body.jugadorId, body.dni)
     return { data: aMeResponder(usuario) }
   })
 }

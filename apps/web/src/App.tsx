@@ -7,6 +7,9 @@ import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
 import TorneosPage from './pages/torneos/TorneosPage'
 import TorneoDetailPage from './pages/torneos/TorneoDetailPage'
+import EquiposPage from './pages/equipos/EquiposPage'
+import EquipoPage from './pages/equipos/EquipoPage'
+import JugadorPage from './pages/jugadores/JugadorPage'
 import './index.css'
 
 function App() {
@@ -59,6 +62,30 @@ function App() {
             element={
               <RequireAuth>
                 <TorneoDetailPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/equipos"
+            element={
+              <RequireAuth>
+                <EquiposPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/equipos/:id"
+            element={
+              <RequireAuth>
+                <EquipoPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/jugadores/:id"
+            element={
+              <RequireAuth>
+                <JugadorPage />
               </RequireAuth>
             }
           />

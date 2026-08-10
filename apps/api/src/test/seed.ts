@@ -45,9 +45,12 @@ export async function crearUsuario(datos: {
 export async function crearPersonaJugador(
   nombre: string,
   apellido = 'Test',
+  datos?: { dni?: string; email?: string },
 ): Promise<{ persona: { id: string }; jugador: { id: string } }> {
   const prisma = getPrisma()
-  const persona = await prisma.persona.create({ data: { nombre, apellido } })
+  const persona = await prisma.persona.create({
+    data: { nombre, apellido, dni: datos?.dni ?? null, email: datos?.email ?? null },
+  })
   const jugador = await prisma.jugador.create({ data: { personaId: persona.id } })
   return { persona: { id: persona.id }, jugador: { id: jugador.id } }
 }

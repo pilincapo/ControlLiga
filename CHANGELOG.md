@@ -2,6 +2,23 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.4.0] - 2026-08-10
+
+### Agregado
+
+- **FASE 4 — Equipos, planteles y jugadores** (diseño aprobado en `docs/fase-4-diseno-equipos.md`).
+- Schema: `EstadoEquipo` (`ACTIVO/INACTIVO/ARCHIVADO`) y `EstadoEquipoJugador` (`ACTIVO/INACTIVO/LESIONADO/SUSPENDIDO/INVITADO/BAJA`) que reemplaza `EquipoJugador.activo`; campos nuevos en `Equipo` (`estado`, `categoriaHabitual`, `telefono`, `email`, `configuracionPublica`) y `EquipoUsuario` (`invitadoPorId`, `fechaBaja`); `EquipoJugador.observaciones`.
+- Todas las referencias a `EquipoJugador.activo` reemplazadas en backend (permisos, torneos, `JugadorParticipacion`, endpoints); sin filtros antiguos.
+- Backend equipos: crear (el creador queda DELEGADO), consultar (dashboard), listar, editar (datos, contacto, estado, privacidad, config pública), administradores (agregar/cambiar rol/dar de baja con historial; protección del último DELEGADO).
+- Backend jugadores: crear (con/sin DNI, sin duplicar Persona), búsqueda por DNI, ficha completa (historial de equipos y competiciones, estado de vínculo), editar (por rol).
+- Backend plantel: incorporar jugador nuevo o existente, dorsal/posiciones/observaciones por equipo, cambio de estado, baja sin borrado físico, historial conservado en cambios de equipo.
+- Permisos: hooks `requiereRolEnEquipo` y helper `puedeEnEquipo` (DELEGADO/TECNICO/AUXILIAR); corrección de seguridad en hooks (el `equipoId` se resuelve del param correcto y no se acepta ausente). El DELEGADO solo administra sus equipos.
+- Vinculación segura: registro acepta `dni` opcional; vincular exige coincidencia de DNI o email (`Persona`). Imposible apropiarse de otro jugador sin identidad verificada.
+- Shared: `POSICIONES_BASE` (`ARQUERO/DEFENSOR/MEDIOCAMPISTA/DELANTERO`), estados de equipo/jugador y `ConfiguracionPublicaEquipo` con validación.
+- Frontend: `/equipos` (listar + crear), `/equipos/:id` (dashboard con plantel, jugadores, administradores y configuración; Formaciones/Convocatorias/Partidos/Caja deshabilitados), `/jugadores/:id` (ficha).
+- Tests: 26 tests nuevos de FASE 4 (equipos, roles por equipo, jugadores, plantel, historial, privacidad, vinculación segura, auditoría) + ajuste de auth por identidad. Total API: 97.
+- Migración `fase4_equipos` aplicada y cliente Prisma regenerado.
+
 ## [0.3.0] - 2026-08-10
 
 ### Agregado

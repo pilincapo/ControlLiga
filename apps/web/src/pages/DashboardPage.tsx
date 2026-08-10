@@ -15,7 +15,7 @@ const SECCIONES: Seccion[] = [
   { titulo: 'Administración global', permiso: null, detalle: 'SUPERADMIN: control total del sistema' },
   { titulo: 'Torneos', permiso: PERMISOS.torneosVer, detalle: 'Crear y administrar torneos', enlace: '/torneos' },
   { titulo: 'Organizaciones', permiso: PERMISOS.organizacionesAdministrar, detalle: 'Administrar organizaciones' },
-  { titulo: 'Mis equipos', permiso: PERMISOS.equiposVer, detalle: 'Equipos donde participás' },
+  { titulo: 'Mis equipos', permiso: PERMISOS.equiposVer, detalle: 'Equipos donde participás', enlace: '/equipos' },
   { titulo: 'Plantel', permiso: PERMISOS.jugadoresGestionar, detalle: 'Jugadores de tus equipos' },
   { titulo: 'Convocatorias', permiso: PERMISOS.convocatoriasGestionar, detalle: 'Crear y gestionar convocatorias' },
   { titulo: 'Formaciones', permiso: PERMISOS.formacionesGestionar, detalle: 'Armar formaciones' },

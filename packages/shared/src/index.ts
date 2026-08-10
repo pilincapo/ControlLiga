@@ -38,3 +38,16 @@ export {
   type ConfiguracionFormato,
   type ConfiguracionPublica,
 } from './torneos.js'
+export {
+  POSICIONES_BASE,
+  ESTADOS_EQUIPO,
+  ESTADOS_EQUIPO_JUGADOR,
+  CLAVES_CONFIGURACION_PUBLICA_EQUIPO,
+  CONFIGURACION_PUBLICA_EQUIPO_DEFECTO,
+  validarConfiguracionPublicaEquipo,
+  esPosicionBase,
+  type PosicionBase,
+  type EstadoEquipo,
+  type EstadoEquipoJugador,
+  type ConfiguracionPublicaEquipo,
+} from './equipos.js'

@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import type { Permiso, RolCodigo } from '@controlliga/shared'
+import type { Permiso, RolCodigo, RolEnEquipo } from '@controlliga/shared'
 import { PERMISOS } from '@controlliga/shared'
 import type { ContextoAuth } from '../auth/contexto.js'
-import { esMiembroEquipo } from '../auth/permisos.js'
+import { esMiembroEquipo, puedeEnEquipo } from '../auth/permisos.js'
 import { validarSesion } from '../auth/servicio.js'
 import { getPrisma } from '../db.js'
 import { noAutenticado, prohibido } from '../http.js'
@@ -52,11 +52,31 @@ export function requierePermiso(...permitidos: Permiso[]): PreHandler {
   }
 }
 
+function equipoIdDe(request: FastifyRequest): string {
+  const params = request.params as { equipoId?: string; id?: string }
+  const equipoId = params.equipoId ?? params.id
+  if (!equipoId) {
+    throw prohibido('Falta el identificador del equipo')
+  }
+  return equipoId
+}
+
 export async function requiereAccesoEquipo(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   await autenticar(request, reply)
   const auth = getAuth(request)
-  const { equipoId } = request.params as { equipoId: string }
+  const equipoId = equipoIdDe(request)
   if (!(await esMiembroEquipo(getPrisma(), auth, equipoId))) {
     throw prohibido('No tenés acceso a ese equipo')
+  }
+}
+
+export function requiereRolEnEquipo(...roles: RolEnEquipo[]): PreHandler {
+  return async (request, reply) => {
+    await autenticar(request, reply)
+    const auth = getAuth(request)
+    const equipoId = equipoIdDe(request)
+    if (!(await puedeEnEquipo(getPrisma(), auth, equipoId, ...roles))) {
+      throw prohibido('No tenés el rol requerido en ese equipo')
+    }
   }
 }
