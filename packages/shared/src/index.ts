@@ -51,3 +51,13 @@ export {
   type EstadoEquipoJugador,
   type ConfiguracionPublicaEquipo,
 } from './equipos.js'
+export {
+  TIPOS_FORMACION,
+  ESTADOS_EN_FORMACION,
+  COORDENADA_MIN,
+  COORDENADA_MAX,
+  esTipoFormacion,
+  coordenadasValidas,
+  type TipoFormacion,
+  type EstadoEnFormacion,
+} from './formaciones.js'

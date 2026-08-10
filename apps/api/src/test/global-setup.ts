@@ -3,6 +3,7 @@ import 'dotenv/config'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '../generated/prisma/client.js'
 import { TEST_DB, TEST_URL, limpiarBase } from './limpiar.js'
+import { sembrarPlantillas } from '../seed/plantillas.js'
 
 async function ensureDatabase(): Promise<void> {
   const baseUrl = TEST_URL.replace(`/${TEST_DB}?`, '/controlliga?')
@@ -29,4 +30,10 @@ export default async function globalSetup(): Promise<void> {
     shell: process.platform === 'win32' ? 'pwsh' : '/bin/sh',
   })
   await limpiarBase()
+  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: TEST_URL }) })
+  try {
+    await sembrarPlantillas(prisma)
+  } finally {
+    await prisma.$disconnect()
+  }
 }

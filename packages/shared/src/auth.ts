@@ -26,6 +26,7 @@ export const PERMISOS = {
   cajaAdministrar: 'caja:administrar',
   convocatoriasVer: 'convocatorias:ver',
   convocatoriasGestionar: 'convocatorias:gestionar',
+  formacionesVer: 'formaciones:ver',
   formacionesGestionar: 'formaciones:gestionar',
   global: '*',
 } as const
@@ -47,6 +48,7 @@ export const ROL_PERMISOS: Record<RolCodigo, readonly Permiso[]> = {
     PERMISOS.sancionesGestionar,
     PERMISOS.estadisticasVer,
     PERMISOS.convocatoriasVer,
+    PERMISOS.formacionesVer,
   ],
   DELEGADO_TECNICO: [
     PERMISOS.equiposAdministrar,
@@ -63,6 +65,7 @@ export const ROL_PERMISOS: Record<RolCodigo, readonly Permiso[]> = {
     PERMISOS.convocatoriasGestionar,
     PERMISOS.convocatoriasVer,
     PERMISOS.formacionesGestionar,
+    PERMISOS.formacionesVer,
     PERMISOS.perfilVer,
   ],
   JUGADOR: [
@@ -73,6 +76,7 @@ export const ROL_PERMISOS: Record<RolCodigo, readonly Permiso[]> = {
     PERMISOS.estadisticasVer,
     PERMISOS.convocatoriasVer,
     PERMISOS.partidosVer,
+    PERMISOS.formacionesVer,
   ],
 }
 

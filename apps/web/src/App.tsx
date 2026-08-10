@@ -10,6 +10,8 @@ import TorneoDetailPage from './pages/torneos/TorneoDetailPage'
 import EquiposPage from './pages/equipos/EquiposPage'
 import EquipoPage from './pages/equipos/EquipoPage'
 import JugadorPage from './pages/jugadores/JugadorPage'
+import FormacionesPage from './pages/formaciones/FormacionesPage'
+import FormacionPage from './pages/formaciones/FormacionPage'
 import './index.css'
 
 function App() {
@@ -86,6 +88,22 @@ function App() {
             element={
               <RequireAuth>
                 <JugadorPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/formaciones"
+            element={
+              <RequireAuth>
+                <FormacionesPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/formaciones/:id"
+            element={
+              <RequireAuth>
+                <FormacionPage />
               </RequireAuth>
             }
           />

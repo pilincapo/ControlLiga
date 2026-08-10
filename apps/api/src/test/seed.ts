@@ -172,3 +172,16 @@ export async function crearJugadorParticipacion(
   })
   return { id: jp.id }
 }
+
+export async function crearPartido(equipoId: string, datos?: { tipo?: 'OFICIAL' | 'AMISTOSO' | 'ENTRENAMIENTO' | 'INTERNO' | 'INFORMAL' | 'OTRO' }): Promise<{ id: string }> {
+  const prisma = getPrisma()
+  const partido = await prisma.partido.create({
+    data: {
+      tipo: datos?.tipo ?? 'AMISTOSO',
+      equipoResponsableId: equipoId,
+      equipoLocalId: equipoId,
+      fechaHora: new Date(),
+    },
+  })
+  return { id: partido.id }
+}

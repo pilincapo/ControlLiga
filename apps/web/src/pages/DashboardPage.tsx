@@ -18,7 +18,7 @@ const SECCIONES: Seccion[] = [
   { titulo: 'Mis equipos', permiso: PERMISOS.equiposVer, detalle: 'Equipos donde participás', enlace: '/equipos' },
   { titulo: 'Plantel', permiso: PERMISOS.jugadoresGestionar, detalle: 'Jugadores de tus equipos' },
   { titulo: 'Convocatorias', permiso: PERMISOS.convocatoriasGestionar, detalle: 'Crear y gestionar convocatorias' },
-  { titulo: 'Formaciones', permiso: PERMISOS.formacionesGestionar, detalle: 'Armar formaciones' },
+  { titulo: 'Formaciones', permiso: PERMISOS.formacionesVer, detalle: 'Armar y gestionar formaciones', enlace: '/formaciones' },
   { titulo: 'Caja', permiso: PERMISOS.cajaAdministrar, detalle: 'Movimientos de caja del equipo' },
   { titulo: 'Mis convocatorias', permiso: PERMISOS.convocatoriasVer, detalle: 'Tus convocatorias pendientes' },
   { titulo: 'Mis partidos', permiso: PERMISOS.partidosVer, detalle: 'Calendario de tus partidos' },

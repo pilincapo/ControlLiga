@@ -15,6 +15,8 @@ export async function limpiarBase(): Promise<void> {
       prisma.rolUsuario.deleteMany(),
       prisma.convocatoriaJugador.deleteMany(),
       prisma.formacionJugador.deleteMany(),
+      prisma.formacionInstanciaJugador.deleteMany(),
+      prisma.formacionInstancia.deleteMany(),
       prisma.movimientoCaja.deleteMany(),
       prisma.sancion.deleteMany(),
       prisma.equipoUsuario.deleteMany(),

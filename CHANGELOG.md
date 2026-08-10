@@ -2,6 +2,21 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.5.0] - 2026-08-10
+
+### Agregado
+
+- **FASE 5 — Formaciones** (diseño aprobado en `docs/fase-5-diseno-formaciones.md`).
+- Schema: `Formacion.publicada` y `@@index([partidoId])`; `FormacionJugador.x/y` (coordenadas normalizadas 0..100); nuevos `PlantillaFormacion` + `PlantillaFormacionPosicion` (catálogo de sistemas con posiciones iniciales) y `FormacionInstancia` + `FormacionInstanciaJugador` (snapshot histórico al usar una formación en un partido, con `nombreSnapshot`/`dorsalSnapshot`).
+- Seed `seed:plantillas` con 14 sistemas (F5/F7/F8/F9/F11) y coordenadas normalizadas; sembrado también en la BD de test.
+- Backend: CRUD de formaciones (crear con o sin partido, con o sin plantilla, leer, editar reemplazando plantel, eliminar solo DELEGADO), clonar, asociar a partido (crea instancia snapshot inmutable), publicar/despublicar, catálogo de plantillas, endpoint público mínimo solo para publicadas.
+- Validaciones: pertenencia al equipo, no duplicar jugador, coordenadas 0..100, jugadores BAJA/INVITADO bloqueados, INACTIVO/LESIONADO/SUSPENDIDO permitidos sin tocar `EquipoJugador`; partido asociado debe involucrar al equipo; una instancia por plantilla+partido.
+- Permisos por rol de equipo (DELEGADO gestiona/elimina, TECNICO gestiona, AUXILIAR consulta, JUGADOR ve los de su equipo, PÚBLICO solo publicadas); nuevo permiso `formaciones:ver` en shared.
+- Auditoría: creación, modificación, eliminación, clonación, asociación a partido, publicación/despublicación.
+- Frontend: `/formaciones` (listar + crear con plantilla y armado de plantel) y `/formaciones/:id` (ver, editar, clonar, publicar/despublicar, eliminar, historial de uso). Sin editor gráfico.
+- Tests: 21 tests de formaciones (catálogo, CRUD, plantilla, validaciones, clonado, snapshot inmutable, partido ajeno, permisos por rol, privacidad, público, auditoría). Total API: 118.
+- Migración `fase5_formaciones` aplicada y cliente Prisma regenerado.
+
 ## [0.4.0] - 2026-08-10
 
 ### Agregado

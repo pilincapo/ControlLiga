@@ -252,6 +252,7 @@ model Jugador {
   usuario          Usuario?
   pertenencias     EquipoJugador[]
   participaciones  JugadorParticipacion[]
+  formacionesInstancias FormacionInstanciaJugador[]
   sanciones        Sancion[]
   movimientosCaja  MovimientoCaja[]
   createdAt        DateTime         @default(now())
@@ -560,6 +561,7 @@ model Partido {
   observaciones       String?
   convocatorias       Convocatoria[]
   formaciones         Formacion[]
+  formacionInstancias FormacionInstancia[]
   sanciones           Sancion[]
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
@@ -609,21 +611,24 @@ model Sancion {
 // ---------- FORMACIONES ----------
 
 model Formacion {
-  id            String             @id @default(uuid()) @db.Uuid
-  equipoId      String             @db.Uuid
-  equipo        Equipo             @relation(fields: [equipoId], references: [id])
-  partidoId     String?            @db.Uuid
-  partido       Partido?           @relation(fields: [partidoId], references: [id])
+  id            String                   @id @default(uuid()) @db.Uuid
+  equipoId      String                   @db.Uuid
+  equipo        Equipo                   @relation(fields: [equipoId], references: [id])
+  partidoId     String?                  @db.Uuid
+  partido       Partido?                 @relation(fields: [partidoId], references: [id])
   nombre        String
   formacionTipo TipoFormacion
   esquema       String?
-  fecha         DateTime           @default(now())
+  publicada     Boolean                  @default(false)
+  fecha         DateTime                 @default(now())
   notas         String?
   jugadores     FormacionJugador[]
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  instancias    FormacionInstancia[]
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
 
   @@index([equipoId, fecha])
+  @@index([partidoId])
   @@map("formaciones")
 }
 
@@ -635,11 +640,78 @@ model FormacionJugador {
   equipoJugador   EquipoJugador @relation(fields: [equipoJugadorId], references: [id])
   posicion        String
   esTitular       Boolean       @default(false)
+  x               Int?
+  y               Int?
   orden           Int           @default(0)
 
   @@unique([formacionId, equipoJugadorId])
   @@index([equipoJugadorId])
   @@map("formacion_jugador")
+}
+
+model PlantillaFormacion {
+  id            String                        @id @default(uuid()) @db.Uuid
+  nombre        String
+  formacionTipo TipoFormacion
+  esquema       String
+  descripcion   String?
+  orden         Int                           @default(0)
+  posiciones    PlantillaFormacionPosicion[]
+  createdAt     DateTime                      @default(now())
+
+  @@index([formacionTipo])
+  @@map("plantilla_formacion")
+}
+
+model PlantillaFormacionPosicion {
+  id          String             @id @default(uuid()) @db.Uuid
+  plantillaId String             @db.Uuid
+  plantilla   PlantillaFormacion @relation(fields: [plantillaId], references: [id])
+  posicion    String
+  esTitular   Boolean            @default(true)
+  x           Int?
+  y           Int?
+  orden       Int
+
+  @@unique([plantillaId, orden])
+  @@map("plantilla_formacion_posicion")
+}
+
+model FormacionInstancia {
+  id            String                        @id @default(uuid()) @db.Uuid
+  formacionId   String?                       @db.Uuid
+  formacion     Formacion?                    @relation(fields: [formacionId], references: [id])
+  partidoId     String                        @db.Uuid
+  partido       Partido                       @relation(fields: [partidoId], references: [id])
+  nombre        String
+  formacionTipo TipoFormacion
+  esquema       String?
+  fecha         DateTime                      @default(now())
+  jugadores     FormacionInstanciaJugador[]
+  createdAt     DateTime                      @default(now())
+
+  @@unique([formacionId, partidoId])
+  @@index([partidoId])
+  @@map("formacion_instancia")
+}
+
+model FormacionInstanciaJugador {
+  id                   String               @id @default(uuid()) @db.Uuid
+  formacionInstanciaId String               @db.Uuid
+  formacionInstancia   FormacionInstancia   @relation(fields: [formacionInstanciaId], references: [id])
+  jugadorId            String               @db.Uuid
+  jugador              Jugador              @relation(fields: [jugadorId], references: [id])
+  nombreSnapshot       String
+  dorsalSnapshot       Int?
+  posicion             String
+  esTitular            Boolean              @default(false)
+  x                    Int?
+  y                    Int?
+  orden                Int                  @default(0)
+
+  @@unique([formacionInstanciaId, jugadorId])
+  @@index([jugadorId])
+  @@map("formacion_instancia_jugador")
 }
 
 // ---------- CONVOCATORIAS ----------
