@@ -12,6 +12,8 @@ import EquipoPage from './pages/equipos/EquipoPage'
 import JugadorPage from './pages/jugadores/JugadorPage'
 import FormacionesPage from './pages/formaciones/FormacionesPage'
 import FormacionPage from './pages/formaciones/FormacionPage'
+import ConvocatoriasPage from './pages/convocatorias/ConvocatoriasPage'
+import ConvocatoriaPage from './pages/convocatorias/ConvocatoriaPage'
 import './index.css'
 
 function App() {
@@ -104,6 +106,22 @@ function App() {
             element={
               <RequireAuth>
                 <FormacionPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/convocatorias"
+            element={
+              <RequireAuth>
+                <ConvocatoriasPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/convocatorias/:id"
+            element={
+              <RequireAuth>
+                <ConvocatoriaPage />
               </RequireAuth>
             }
           />

@@ -723,9 +723,12 @@ model Convocatoria {
   partidoId   String?               @db.Uuid
   partido     Partido?              @relation(fields: [partidoId], references: [id])
   fecha       DateTime
+  fechaLimite DateTime?
   lugar       String?
   hora        String?
   notas       String?
+  publicada   Boolean               @default(false)
+  cancelada   Boolean               @default(false)
   creadoPorId String?               @db.Uuid
   creadoPor   Usuario?              @relation("ConvocatoriaCreador", fields: [creadoPorId], references: [id])
   jugadores   ConvocatoriaJugador[]
@@ -743,6 +746,7 @@ model ConvocatoriaJugador {
   equipoJugadorId String          @db.Uuid
   equipoJugador   EquipoJugador   @relation(fields: [equipoJugadorId], references: [id])
   estado          EstadoConvocado @default(PENDIENTE)
+  orden           Int             @default(0)
   nota            String?
   respondioEn     DateTime?
 

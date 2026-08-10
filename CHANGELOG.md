@@ -2,6 +2,20 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.6.0] - 2026-08-10
+
+### Agregado
+
+- **FASE 6 — Convocatorias** (diseño aprobado en `docs/fase-6-diseno-convocatorias.md`).
+- Schema: `Convocatoria.fechaLimite`, `publicada`, `cancelada` (soft delete); `ConvocatoriaJugador.orden`.
+- Backend: CRUD de convocatorias (crear con jugadores, editar reemplazando plantel, cancelar como soft delete), respuesta del jugador (`CONFIRMADO/NO_DISPONIBLE` con verificación de identidad), DELEGADO/TECNICO cambian estado de cualquier convocado, publicar/despublicar, listado por equipo, endpoint público solo publicadas y no canceladas.
+- Validaciones: BAJA/INVITADO bloqueados al convocar; INACTIVO/LESIONADO/SUSPENDIDO permitidos sin tocar `EquipoJugador`; jugador solo responde su propia convocatoria; cancelada no editable ni respuestas.
+- Permisos por rol (DELEGADO/TECNICO gestionan y cancelan, AUXILIAR consulta, JUGADOR consulta y responde la propia, PÚBLICO solo publicadas). Enforcement con `puedeEnEquipo`/`requiereRolEnEquipo`.
+- Auditoría: creación/modificación/cancelación de `Convocatoria`, respuesta de jugador (UPDATE `ConvocatoriaJugador`).
+- Frontend: `/convocatorias` (listar por equipo + crear con selección de jugadores del plantel) y `/convocatorias/:id` (ver, responder como jugador, cambiar estado, cancelar, publicar).
+- Tests: 17 tests de convocatorias. Total API: 135.
+- Migración `fase6_convocatorias` aplicada y cliente Prisma regenerado.
+
 ## [0.5.0] - 2026-08-10
 
 ### Agregado

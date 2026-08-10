@@ -19,6 +19,7 @@ import { zonasRoutes } from './routes/zonas.js'
 import { participacionesRoutes } from './routes/participaciones.js'
 import { jugadorParticipacionesRoutes } from './routes/jugador-participaciones.js'
 import { formacionesRoutes } from './routes/formaciones.js'
+import { convocatoriasRoutes } from './routes/convocatorias.js'
 
 export function buildApp() {
   const app = Fastify({ logger: true })
@@ -65,6 +66,7 @@ export function buildApp() {
   app.register(participacionesRoutes, { prefix: '/api' })
   app.register(jugadorParticipacionesRoutes, { prefix: '/api' })
   app.register(formacionesRoutes, { prefix: '/api' })
+  app.register(convocatoriasRoutes, { prefix: '/api' })
 
   return app
 }
