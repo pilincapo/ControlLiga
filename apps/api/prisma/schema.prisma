@@ -1,0 +1,615 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- ENUMS ----------
+
+enum RolCodigo {
+  SUPERADMIN
+  ADMINISTRADOR
+  DELEGADO_TECNICO
+  JUGADOR
+}
+
+enum RolEnEquipo {
+  DELEGADO
+  TECNICO
+  AUXILIAR
+}
+
+enum EstadoTemporada {
+  BORRADOR
+  PUBLICADO
+  EN_CURSO
+  FINALIZADO
+  CANCELADO
+}
+
+enum EstadoTorneoCategoria {
+  ACTIVA
+  CERRADA
+}
+
+enum EstadoParticipacion {
+  INSCRIPTO
+  CONFIRMADO
+  BAJA
+}
+
+enum TipoPartido {
+  OFICIAL
+  AMISTOSO
+  ENTRENAMIENTO
+  INTERNO
+  INFORMAL
+  OTRO
+}
+
+enum EstadoPartido {
+  PROGRAMADO
+  EN_CURSO
+  FINALIZADO
+  SUSPENDIDO
+  APLAZADO
+}
+
+enum TipoFormacion {
+  FUTBOL_5
+  FUTBOL_7
+  FUTBOL_8
+  FUTBOL_9
+  FUTBOL_11
+  PERSONALIZADA
+}
+
+enum EstadoConvocado {
+  CONFIRMADO
+  PENDIENTE
+  NO_DISPONIBLE
+  AUSENTE
+}
+
+enum TipoMovimiento {
+  INGRESO
+  EGRESO
+}
+
+enum CategoriaMovimiento {
+  CUOTA
+  APORTE
+  INSCRIPCION
+  OTROS
+  CANCHA
+  ARBITRO
+  EQUIPAMIENTO
+  VIAJE
+  TERCER_TIEMPO
+}
+
+enum EstadoMovimiento {
+  PENDIENTE
+  PAGADO
+  ANULADO
+}
+
+enum OrigenSancion {
+  PARTIDO
+  ACUMULACION_TARJETAS
+  ADMINISTRATIVA
+  TRIBUNAL
+  OTRO
+}
+
+enum TipoSancion {
+  AMARILLA
+  ROJA
+  SUSPENSION
+  APELACION
+  OTRA
+}
+
+enum AccionAuditoria {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+// ---------- USUARIOS Y ROLES ----------
+
+model Usuario {
+  id                     String           @id @default(uuid()) @db.Uuid
+  email                  String           @unique
+  passwordHash           String
+  nombre                 String
+  apellido               String
+  activo                 Boolean          @default(true)
+  jugadorId              String?          @unique @db.Uuid
+  jugador                Jugador?         @relation(fields: [jugadorId], references: [id])
+  roles                  RolUsuario[]
+  equipos                EquipoUsuario[]
+  equiposCreados         Equipo[]         @relation("EquipoCreador")
+  convocatoriasCreadas   Convocatoria[]   @relation("ConvocatoriaCreador")
+  movimientosCajaCreados MovimientoCaja[] @relation("CajaCreador")
+  auditoriaLogs          AuditoriaLog[]
+  sesiones               Session[]
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  @@map("usuarios")
+}
+
+model Rol {
+  id       String       @id @default(uuid()) @db.Uuid
+  codigo   RolCodigo    @unique
+  nombre   String
+  usuarios RolUsuario[]
+
+  @@map("roles")
+}
+
+model RolUsuario {
+  id             String        @id @default(uuid()) @db.Uuid
+  usuarioId      String        @db.Uuid
+  usuario        Usuario       @relation(fields: [usuarioId], references: [id])
+  rolId          String        @db.Uuid
+  rol            Rol           @relation(fields: [rolId], references: [id])
+  organizacionId String?       @db.Uuid
+  organizacion   Organizacion? @relation(fields: [organizacionId], references: [id])
+  torneoId       String?       @db.Uuid
+  torneo         Torneo?       @relation(fields: [torneoId], references: [id])
+  equipoId       String?       @db.Uuid
+  equipo         Equipo?       @relation(fields: [equipoId], references: [id])
+  jugadorId      String?       @db.Uuid
+  jugador        Jugador?      @relation(fields: [jugadorId], references: [id])
+  activo         Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+
+  @@index([usuarioId])
+  @@index([rolId])
+  @@index([organizacionId])
+  @@index([torneoId])
+  @@index([equipoId])
+  @@map("rol_usuario")
+}
+
+// ---------- PERSONA / JUGADOR ----------
+
+model Persona {
+  id              String    @id @default(uuid()) @db.Uuid
+  nombre          String
+  apellido        String
+  dni             String?   @unique
+  fechaNacimiento DateTime?
+  email           String?
+  telefono        String?
+  fotoUrl         String?
+  sexo            String?
+  jugador         Jugador?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("personas")
+}
+
+model Jugador {
+  id               String           @id @default(uuid()) @db.Uuid
+  personaId        String           @unique @db.Uuid
+  persona          Persona          @relation(fields: [personaId], references: [id])
+  pieDominante     String?
+  posicionFavorita String?
+  alturaCm         Int?
+  pesoKg           Decimal?         @db.Decimal(5, 2)
+  usuario          Usuario?
+  pertenencias     EquipoJugador[]
+  sanciones        Sancion[]
+  movimientosCaja  MovimientoCaja[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  rolUsuarios      RolUsuario[]
+
+  @@map("jugadores")
+}
+
+// ---------- EQUIPO ----------
+
+model Equipo {
+  id                  String                @id @default(uuid()) @db.Uuid
+  nombre              String
+  escudoUrl           String?
+  descripcion         String?
+  colorPrincipal      String?
+  colorSecundario     String?
+  privado             Boolean               @default(true)
+  creadoPorId         String?               @db.Uuid
+  creadoPor           Usuario?              @relation("EquipoCreador", fields: [creadoPorId], references: [id])
+  usuarios            EquipoUsuario[]
+  jugadores           EquipoJugador[]
+  participaciones     EquipoParticipacion[]
+  partidosResponsable Partido[]             @relation("PartidoEquipoResponsable")
+  partidosLocal       Partido[]             @relation("PartidoEquipoLocal")
+  partidosVisitante   Partido[]             @relation("PartidoEquipoVisitante")
+  formaciones         Formacion[]
+  convocatorias       Convocatoria[]
+  movimientosCaja     MovimientoCaja[]
+  sanciones           Sancion[]
+  rolesUsuarios       RolUsuario[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([creadoPorId])
+  @@map("equipos")
+}
+
+model EquipoUsuario {
+  id          String      @id @default(uuid()) @db.Uuid
+  equipoId    String      @db.Uuid
+  equipo      Equipo      @relation(fields: [equipoId], references: [id])
+  usuarioId   String      @db.Uuid
+  usuario     Usuario     @relation(fields: [usuarioId], references: [id])
+  rolEnEquipo RolEnEquipo
+  activo      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+
+  @@index([equipoId, activo])
+  @@index([usuarioId, activo])
+  @@map("equipo_usuario")
+}
+
+model EquipoJugador {
+  id            String                @id @default(uuid()) @db.Uuid
+  equipoId      String                @db.Uuid
+  equipo        Equipo                @relation(fields: [equipoId], references: [id])
+  jugadorId     String                @db.Uuid
+  jugador       Jugador               @relation(fields: [jugadorId], references: [id])
+  dorsal        Int?
+  posiciones    String?
+  fechaIngreso  DateTime              @default(now())
+  fechaSalida   DateTime?
+  activo        Boolean               @default(true)
+  motivoBaja    String?
+  formaciones   FormacionJugador[]
+  convocatorias ConvocatoriaJugador[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([equipoId, activo])
+  @@index([jugadorId, activo])
+  @@map("equipo_jugador")
+}
+
+// ---------- TORNEOS ----------
+
+model Organizacion {
+  id            String       @id @default(uuid()) @db.Uuid
+  nombre        String
+  descripcion   String?
+  torneos       Torneo[]
+  rolesUsuarios RolUsuario[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("organizaciones")
+}
+
+model Torneo {
+  id               String                @id @default(uuid()) @db.Uuid
+  organizacionId   String?               @db.Uuid
+  organizacion     Organizacion?         @relation(fields: [organizacionId], references: [id])
+  nombre           String
+  descripcion      String?
+  activo           Boolean               @default(true)
+  visiblePublico   Boolean               @default(false)
+  temporadas       Temporada[]
+  torneoCategorias TorneoCategoria[]
+  zonas            Zona[]
+  participaciones  EquipoParticipacion[]
+  partidos         Partido[]
+  sanciones        Sancion[]
+  rolesUsuarios    RolUsuario[]
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([organizacionId])
+  @@map("torneos")
+}
+
+model Temporada {
+  id               String                @id @default(uuid()) @db.Uuid
+  torneoId         String                @db.Uuid
+  torneo           Torneo                @relation(fields: [torneoId], references: [id])
+  nombre           String
+  fechaInicio      DateTime
+  fechaFin         DateTime?
+  estado           EstadoTemporada       @default(BORRADOR)
+  torneoCategorias TorneoCategoria[]
+  participaciones  EquipoParticipacion[]
+  partidos         Partido[]
+  sanciones        Sancion[]
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([torneoId])
+  @@map("temporadas")
+}
+
+model Categoria {
+  id               String            @id @default(uuid()) @db.Uuid
+  nombre           String
+  descripcion      String?
+  torneoCategorias TorneoCategoria[]
+  createdAt        DateTime          @default(now())
+
+  @@map("categorias")
+}
+
+model TorneoCategoria {
+  id              String                @id @default(uuid()) @db.Uuid
+  torneoId        String                @db.Uuid
+  torneo          Torneo                @relation(fields: [torneoId], references: [id])
+  temporadaId     String                @db.Uuid
+  temporada       Temporada             @relation(fields: [temporadaId], references: [id])
+  categoriaId     String                @db.Uuid
+  categoria       Categoria             @relation(fields: [categoriaId], references: [id])
+  estado          EstadoTorneoCategoria @default(ACTIVA)
+  zonas           Zona[]
+  participaciones EquipoParticipacion[]
+  partidos        Partido[]
+  sanciones       Sancion[]
+  createdAt       DateTime              @default(now())
+
+  @@unique([torneoId, temporadaId, categoriaId])
+  @@index([temporadaId])
+  @@map("torneo_categoria")
+}
+
+model Zona {
+  id                String                @id @default(uuid()) @db.Uuid
+  torneoCategoriaId String                @db.Uuid
+  torneoCategoria   TorneoCategoria       @relation(fields: [torneoCategoriaId], references: [id])
+  nombre            String
+  participaciones   EquipoParticipacion[]
+  partidos          Partido[]
+  sanciones         Sancion[]
+  createdAt         DateTime              @default(now())
+  torneo            Torneo?               @relation(fields: [torneoId], references: [id])
+  torneoId          String?               @db.Uuid
+
+  @@index([torneoCategoriaId])
+  @@map("zonas")
+}
+
+model EquipoParticipacion {
+  id                String              @id @default(uuid()) @db.Uuid
+  torneoId          String              @db.Uuid
+  torneo            Torneo              @relation(fields: [torneoId], references: [id])
+  temporadaId       String              @db.Uuid
+  temporada         Temporada           @relation(fields: [temporadaId], references: [id])
+  torneoCategoriaId String?             @db.Uuid
+  torneoCategoria   TorneoCategoria?    @relation(fields: [torneoCategoriaId], references: [id])
+  zonaId            String?             @db.Uuid
+  zona              Zona?               @relation(fields: [zonaId], references: [id])
+  equipoId          String              @db.Uuid
+  equipo            Equipo              @relation(fields: [equipoId], references: [id])
+  estado            EstadoParticipacion @default(INSCRIPTO)
+  fechaInscripcion  DateTime            @default(now())
+  createdAt         DateTime            @default(now())
+
+  @@unique([equipoId, torneoId, temporadaId])
+  @@index([torneoId])
+  @@index([temporadaId])
+  @@index([torneoCategoriaId])
+  @@index([zonaId])
+  @@map("equipo_participacion")
+}
+
+// ---------- PARTIDOS ----------
+
+model Partido {
+  id                  String           @id @default(uuid()) @db.Uuid
+  tipo                TipoPartido
+  equipoResponsableId String?          @db.Uuid
+  equipoResponsable   Equipo?          @relation("PartidoEquipoResponsable", fields: [equipoResponsableId], references: [id])
+  torneoId            String?          @db.Uuid
+  torneo              Torneo?          @relation(fields: [torneoId], references: [id])
+  temporadaId         String?          @db.Uuid
+  temporada           Temporada?       @relation(fields: [temporadaId], references: [id])
+  torneoCategoriaId   String?          @db.Uuid
+  torneoCategoria     TorneoCategoria? @relation(fields: [torneoCategoriaId], references: [id])
+  zonaId              String?          @db.Uuid
+  zona                Zona?            @relation(fields: [zonaId], references: [id])
+  equipoLocalId       String?          @db.Uuid
+  equipoLocal         Equipo?          @relation("PartidoEquipoLocal", fields: [equipoLocalId], references: [id])
+  equipoVisitanteId   String?          @db.Uuid
+  equipoVisitante     Equipo?          @relation("PartidoEquipoVisitante", fields: [equipoVisitanteId], references: [id])
+  fechaHora           DateTime
+  lugar               String?
+  estado              EstadoPartido    @default(PROGRAMADO)
+  golesLocal          Int?
+  golesVisitante      Int?
+  observaciones       String?
+  convocatorias       Convocatoria[]
+  formaciones         Formacion[]
+  sanciones           Sancion[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([equipoLocalId])
+  @@index([equipoVisitanteId])
+  @@index([torneoId])
+  @@index([temporadaId])
+  @@index([fechaHora])
+  @@index([equipoResponsableId, tipo])
+  @@map("partidos")
+}
+
+model Sancion {
+  id                String           @id @default(uuid()) @db.Uuid
+  jugadorId         String?          @db.Uuid
+  jugador           Jugador?         @relation(fields: [jugadorId], references: [id])
+  equipoId          String           @db.Uuid
+  equipo            Equipo           @relation(fields: [equipoId], references: [id])
+  origen            OrigenSancion
+  tipo              TipoSancion
+  partidoId         String?          @db.Uuid
+  partido           Partido?         @relation(fields: [partidoId], references: [id])
+  torneoId          String?          @db.Uuid
+  torneo            Torneo?          @relation(fields: [torneoId], references: [id])
+  temporadaId       String?          @db.Uuid
+  temporada         Temporada?       @relation(fields: [temporadaId], references: [id])
+  torneoCategoriaId String?          @db.Uuid
+  torneoCategoria   TorneoCategoria? @relation(fields: [torneoCategoriaId], references: [id])
+  zonaId            String?          @db.Uuid
+  zona              Zona?            @relation(fields: [zonaId], references: [id])
+  motivo            String
+  fechaInicio       DateTime
+  fechaFin          DateTime?
+  resuelta          Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([jugadorId])
+  @@index([equipoId])
+  @@index([torneoId])
+  @@index([partidoId])
+  @@map("sanciones")
+}
+
+// ---------- FORMACIONES ----------
+
+model Formacion {
+  id            String             @id @default(uuid()) @db.Uuid
+  equipoId      String             @db.Uuid
+  equipo        Equipo             @relation(fields: [equipoId], references: [id])
+  partidoId     String?            @db.Uuid
+  partido       Partido?           @relation(fields: [partidoId], references: [id])
+  nombre        String
+  formacionTipo TipoFormacion
+  esquema       String?
+  fecha         DateTime           @default(now())
+  notas         String?
+  jugadores     FormacionJugador[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([equipoId, fecha])
+  @@map("formaciones")
+}
+
+model FormacionJugador {
+  id              String        @id @default(uuid()) @db.Uuid
+  formacionId     String        @db.Uuid
+  formacion       Formacion     @relation(fields: [formacionId], references: [id])
+  equipoJugadorId String        @db.Uuid
+  equipoJugador   EquipoJugador @relation(fields: [equipoJugadorId], references: [id])
+  posicion        String
+  esTitular       Boolean       @default(false)
+  orden           Int           @default(0)
+
+  @@unique([formacionId, equipoJugadorId])
+  @@index([equipoJugadorId])
+  @@map("formacion_jugador")
+}
+
+// ---------- CONVOCATORIAS ----------
+
+model Convocatoria {
+  id          String                @id @default(uuid()) @db.Uuid
+  equipoId    String                @db.Uuid
+  equipo      Equipo                @relation(fields: [equipoId], references: [id])
+  partidoId   String?               @db.Uuid
+  partido     Partido?              @relation(fields: [partidoId], references: [id])
+  fecha       DateTime
+  lugar       String?
+  hora        String?
+  notas       String?
+  creadoPorId String?               @db.Uuid
+  creadoPor   Usuario?              @relation("ConvocatoriaCreador", fields: [creadoPorId], references: [id])
+  jugadores   ConvocatoriaJugador[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([equipoId, fecha])
+  @@map("convocatorias")
+}
+
+model ConvocatoriaJugador {
+  id              String          @id @default(uuid()) @db.Uuid
+  convocatoriaId  String          @db.Uuid
+  convocatoria    Convocatoria    @relation(fields: [convocatoriaId], references: [id])
+  equipoJugadorId String          @db.Uuid
+  equipoJugador   EquipoJugador   @relation(fields: [equipoJugadorId], references: [id])
+  estado          EstadoConvocado @default(PENDIENTE)
+  nota            String?
+  respondioEn     DateTime?
+
+  @@unique([convocatoriaId, equipoJugadorId])
+  @@index([equipoJugadorId])
+  @@map("convocatoria_jugador")
+}
+
+// ---------- CAJA DEL EQUIPO (PRIVADO) ----------
+
+model MovimientoCaja {
+  id             String              @id @default(uuid()) @db.Uuid
+  equipoId       String              @db.Uuid
+  equipo         Equipo              @relation(fields: [equipoId], references: [id])
+  tipo           TipoMovimiento
+  categoria      CategoriaMovimiento
+  concepto       String
+  importe        Decimal             @db.Decimal(10, 2)
+  fecha          DateTime            @default(now())
+  jugadorId      String?             @db.Uuid
+  jugador        Jugador?            @relation(fields: [jugadorId], references: [id])
+  comprobanteUrl String?
+  observaciones  String?
+  estado         EstadoMovimiento    @default(PENDIENTE)
+  creadoPorId    String?             @db.Uuid
+  creadoPor      Usuario?            @relation("CajaCreador", fields: [creadoPorId], references: [id])
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([equipoId, fecha])
+  @@index([equipoId, estado])
+  @@index([jugadorId])
+  @@map("movimiento_caja")
+}
+
+// ---------- SESIONES ----------
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  usuarioId  String    @db.Uuid
+  usuario    Usuario   @relation(fields: [usuarioId], references: [id])
+  tokenHash  String    @unique
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  lastUsedAt DateTime  @default(now())
+  revokedAt  DateTime?
+
+  @@index([usuarioId])
+  @@map("sesiones")
+}
+
+// ---------- AUDITORIA ----------
+
+model AuditoriaLog {
+  id        String          @id @default(uuid()) @db.Uuid
+  entidad   String
+  entidadId String
+  accion    AccionAuditoria
+  usuarioId String?         @db.Uuid
+  usuario   Usuario?        @relation(fields: [usuarioId], references: [id])
+  cambios   Json?
+  fecha     DateTime        @default(now())
+
+  @@index([entidad, entidadId])
+  @@index([usuarioId])
+  @@map("auditoria_log")
+}

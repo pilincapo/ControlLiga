@@ -1,0 +1,28 @@
+# Dependencias
+node_modules/
+
+# Builds
+dist/
+*.tsbuildinfo
+
+# Cobertura de tests
+coverage/
+
+# Variables de entorno (nunca commitear)
+.env
+.env.*
+!.env.example
+
+# Prisma — cliente generado
+apps/api/src/generated/
+
+# Vite
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store
+Thumbs.db

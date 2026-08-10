@@ -1,0 +1,46 @@
+{
+  "name": "controlliga",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CONTROL LIGA — gestión de ligas de fútbol (monorepo)",
+  "packageManager": "pnpm@10.27.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "esbuild",
+      "prisma"
+    ]
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @controlliga/shared build && pnpm --parallel --filter @controlliga/web --filter @controlliga/api dev",
+    "dev:web": "pnpm --filter @controlliga/web dev",
+    "dev:api": "pnpm --filter @controlliga/api dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:up": "docker compose -f docker/docker-compose.yml --env-file docker/.env up -d",
+    "db:down": "docker compose -f docker/docker-compose.yml --env-file docker/.env down",
+    "db:logs": "docker compose -f docker/docker-compose.yml --env-file docker/.env logs -f",
+    "db:reset": "docker compose -f docker/docker-compose.yml --env-file docker/.env down -v",
+    "prisma:generate": "pnpm --filter @controlliga/api prisma:generate",
+    "prisma:migrate": "pnpm --filter @controlliga/api prisma:migrate",
+    "prisma:push": "pnpm --filter @controlliga/api prisma:push",
+    "prisma:studio": "pnpm --filter @controlliga/api prisma:studio"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.9.0",
+    "prettier": "^3.9.6",
+    "typescript-eslint": "^8.66.0"
+  }
+}
