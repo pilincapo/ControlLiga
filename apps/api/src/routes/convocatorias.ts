@@ -8,6 +8,7 @@ import { auditar } from '../auth/auditoria.js'
 import { EstadoEquipoJugador } from '../generated/prisma/enums.js'
 import type { ContextoAuth } from '../auth/contexto.js'
 import type { PrismaClient } from '../generated/prisma/client.js'
+import { notificarJugadoresVinculados } from '../notificaciones/servicio.js'
 
 interface JugadorBody {
   equipoJugadorId: string
@@ -141,6 +142,24 @@ export async function convocatoriasRoutes(app: FastifyInstance): Promise<void> {
       })
       return creada
     })
+    const convocados = await prisma.equipoJugador.findMany({
+      where: { id: { in: jugadores.map((j) => j.equipoJugadorId) } },
+      select: { jugadorId: true },
+    })
+    if (convocados.length > 0) {
+      await notificarJugadoresVinculados(
+        prisma,
+        convocados.map((c) => c.jugadorId),
+        {
+          tipo: 'CONVOCATORIA',
+          titulo: 'Nueva convocatoria',
+          mensaje: `Fuiste convocado para el ${new Date(body.fecha).toLocaleDateString('es-AR')}`,
+          entidadTipo: 'Convocatoria',
+          entidadId: convocatoria.id,
+        },
+        auth.usuarioId,
+      )
+    }
     await auditar(prisma, { entidad: 'Convocatoria', entidadId: convocatoria.id, accion: 'CREATE', usuarioId: auth.usuarioId, cambios: { equipoId: id, fecha: body.fecha, partidoId: body.partidoId ?? null } })
     return { data: convocatoria }
   })
@@ -229,6 +248,24 @@ export async function convocatoriasRoutes(app: FastifyInstance): Promise<void> {
     if (!conv) throw noEncontrado('Convocatoria')
     if (!(await puedeGestionar(prisma, auth, conv.equipoId))) throw prohibido('No tenés permiso para publicar esa convocatoria')
     const res = await prisma.convocatoria.update({ where: { id }, data: { publicada: true }, select: { id: true, publicada: true } })
+    const convocados = await prisma.convocatoriaJugador.findMany({
+      where: { convocatoriaId: id },
+      select: { equipoJugador: { select: { jugadorId: true } } },
+    })
+    if (convocados.length > 0) {
+      await notificarJugadoresVinculados(
+        prisma,
+        convocados.map((c) => c.equipoJugador.jugadorId),
+        {
+          tipo: 'CONVOCATORIA',
+          titulo: 'Convocatoria publicada',
+          mensaje: 'Una convocatoria en la que participás fue publicada',
+          entidadTipo: 'Convocatoria',
+          entidadId: id,
+        },
+        auth.usuarioId,
+      )
+    }
     await auditar(prisma, { entidad: 'Convocatoria', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { publicada: true } })
     return { data: res }
   })

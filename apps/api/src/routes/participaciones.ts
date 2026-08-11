@@ -7,6 +7,7 @@ import { esAdminDeTorneo, esMiembroEquipo, puedeVerTorneo } from '../auth/permis
 import { auditar } from '../auth/auditoria.js'
 import { EstadoParticipacion } from '../generated/prisma/enums.js'
 import type { Prisma } from '../generated/prisma/client.js'
+import { notificarAdminsTorneo, notificarDelegadosEquipos, notificarUsuarios } from '../notificaciones/servicio.js'
 
 const ESTADOS_ACTIVOS: EstadoParticipacion[] = [
   EstadoParticipacion.PENDIENTE,
@@ -81,7 +82,7 @@ async function cargarParticipacion(id: string) {
   const prisma = getPrisma()
   const participacion = await prisma.equipoParticipacion.findUnique({
     where: { id },
-    select: { id: true, torneoId: true, temporadaId: true, equipoId: true, estado: true, torneoCategoriaId: true, zonaId: true },
+    select: { id: true, torneoId: true, temporadaId: true, equipoId: true, estado: true, torneoCategoriaId: true, zonaId: true, invitadoPorId: true },
   })
   return participacion
 }
@@ -119,7 +120,8 @@ export async function participacionesRoutes(app: FastifyInstance): Promise<void>
       if (!temporada || temporada.torneoId !== torneoId) {
         throw noEncontrado('Temporada')
       }
-      const equipo = await prisma.equipo.findUnique({ where: { id: body.equipoId }, select: { id: true } })
+      const torneo = await prisma.torneo.findUnique({ where: { id: torneoId }, select: { nombre: true } })
+      const equipo = await prisma.equipo.findUnique({ where: { id: body.equipoId }, select: { id: true, nombre: true } })
       if (!equipo) {
         throw noEncontrado('Equipo')
       }
@@ -145,6 +147,19 @@ export async function participacionesRoutes(app: FastifyInstance): Promise<void>
           },
         })
       })
+
+      await notificarDelegadosEquipos(
+        prisma,
+        [body.equipoId],
+        {
+          tipo: 'INVITACION_TORNEO',
+          titulo: 'Invitación a torneo',
+          mensaje: `El torneo ${torneo?.nombre ?? ''} invitó a ${equipo.nombre} a participar`,
+          entidadTipo: 'EquipoParticipacion',
+          entidadId: participacion.id,
+        },
+        auth.usuarioId,
+      )
 
       await auditar(prisma, {
         entidad: 'EquipoParticipacion',
@@ -178,6 +193,11 @@ export async function participacionesRoutes(app: FastifyInstance): Promise<void>
       if (!temporada || temporada.torneoId !== torneoId) {
         throw noEncontrado('Temporada')
       }
+      const torneo = await prisma.torneo.findUnique({ where: { id: torneoId }, select: { nombre: true, organizacionId: true } })
+      const equipo = await prisma.equipo.findUnique({ where: { id: body.equipoId }, select: { id: true, nombre: true } })
+      if (!equipo) {
+        throw noEncontrado('Equipo')
+      }
       const { torneoCategoriaId, zonaId } = await validarCategoriaYZona(
         prisma,
         torneoId,
@@ -199,6 +219,22 @@ export async function participacionesRoutes(app: FastifyInstance): Promise<void>
           },
         })
       })
+
+      if (torneo) {
+        await notificarAdminsTorneo(
+          prisma,
+          torneoId,
+          torneo.organizacionId,
+          {
+            tipo: 'SOLICITUD_TORNEO',
+            titulo: 'Solicitud de inscripción',
+            mensaje: `El equipo ${equipo.nombre} solicitó inscribirse en ${torneo.nombre}`,
+            entidadTipo: 'EquipoParticipacion',
+            entidadId: participacion.id,
+          },
+          auth.usuarioId,
+        )
+      }
 
       await auditar(prisma, {
         entidad: 'EquipoParticipacion',
@@ -226,12 +262,27 @@ export async function participacionesRoutes(app: FastifyInstance): Promise<void>
     if (participacion.estado !== EstadoParticipacion.PENDIENTE) {
       throw conflicto('estado_invalido', 'La invitación ya fue respondida')
     }
+    const equipo = await prisma.equipo.findUnique({ where: { id: participacion.equipoId }, select: { nombre: true } })
     const nuevoEstado = body.aceptar ? EstadoParticipacion.CONFIRMADO : EstadoParticipacion.RECHAZADO
     const actualizado = await prisma.equipoParticipacion.update({
       where: { id },
       data: { estado: nuevoEstado },
       select: { id: true, estado: true },
     })
+    if (participacion.invitadoPorId) {
+      await notificarUsuarios(
+        prisma,
+        [participacion.invitadoPorId],
+        {
+          tipo: 'RESPUESTA_INVITACION',
+          titulo: 'Respuesta de invitación a torneo',
+          mensaje: `${equipo?.nombre ?? ''} ${body.aceptar ? 'aceptó' : 'rechazó'} la invitación al torneo`,
+          entidadTipo: 'EquipoParticipacion',
+          entidadId: id,
+        },
+        auth.usuarioId,
+      )
+    }
     await auditar(prisma, {
       entidad: 'EquipoParticipacion',
       entidadId: id,
@@ -257,12 +308,25 @@ export async function participacionesRoutes(app: FastifyInstance): Promise<void>
     if (participacion.estado !== EstadoParticipacion.INSCRIPTO) {
       throw conflicto('estado_invalido', 'No hay una solicitud pendiente para esta participación')
     }
+    const equipo = await prisma.equipo.findUnique({ where: { id: participacion.equipoId }, select: { nombre: true } })
     const nuevoEstado = body.aceptar ? EstadoParticipacion.CONFIRMADO : EstadoParticipacion.RECHAZADO
     const actualizado = await prisma.equipoParticipacion.update({
       where: { id },
       data: { estado: nuevoEstado },
       select: { id: true, estado: true },
     })
+    await notificarDelegadosEquipos(
+      prisma,
+      [participacion.equipoId],
+      {
+        tipo: 'RESPUESTA_INVITACION',
+        titulo: 'Solicitud de inscripción decidida',
+        mensaje: `La solicitud de ${equipo?.nombre ?? ''} fue ${body.aceptar ? 'aceptada' : 'rechazada'}`,
+        entidadTipo: 'EquipoParticipacion',
+        entidadId: id,
+      },
+      auth.usuarioId,
+    )
     await auditar(prisma, {
       entidad: 'EquipoParticipacion',
       entidadId: id,

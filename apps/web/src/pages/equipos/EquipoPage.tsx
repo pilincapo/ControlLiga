@@ -4,7 +4,7 @@ import type { FormEvent } from 'react'
 import { apiFetch } from '../../utils/api'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../auth/useAuth'
-import type { AdministradorEquipo, EquipoDetalle, JugadorPlantelEquipo } from './tipos'
+import type { AdministradorEquipo, EquipoDetalle, InvitacionEquipo, JugadorPlantelEquipo } from './tipos'
 
 const ESTADOS_JUGADOR = ['ACTIVO', 'INACTIVO', 'LESIONADO', 'SUSPENDIDO', 'INVITADO']
 
@@ -81,6 +81,7 @@ export default function EquipoPage() {
     { clave: 'administradores', titulo: 'Administradores' },
     { clave: 'config', titulo: 'Configuración' },
     ...(puedeVerCaja ? [{ clave: 'caja', titulo: 'Caja' }] : []),
+    ...(esSuper || rolEnEquipo ? [{ clave: 'invitaciones', titulo: 'Invitaciones' }] : []),
   ]
 
   return (
@@ -155,6 +156,10 @@ export default function EquipoPage() {
       )}
 
       {seccion === 'caja' && <CajaSection equipoId={equipo.id} puedeAdministrar={esDelegado} plantel={plantel} />}
+
+      {seccion === 'invitaciones' && (
+        <InvitacionesSection equipoId={equipo.id} puedeInvitarJugador={esDelegado || rolEnEquipo === 'TECNICO'} puedeInvitarCuerpo={esDelegado} />
+      )}
     </Layout>
   )
 }
@@ -443,5 +448,200 @@ function ConfigSection({
         </button>
       </form>
     </div>
+  )
+}
+
+function InvitacionesSection({
+  equipoId,
+  puedeInvitarJugador,
+  puedeInvitarCuerpo,
+}: {
+  equipoId: string
+  puedeInvitarJugador: boolean
+  puedeInvitarCuerpo: boolean
+}) {
+  const [invitaciones, setInvitaciones] = useState<InvitacionEquipo[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [mensaje, setMensaje] = useState<string | null>(null)
+
+  const [jugadorId, setJugadorId] = useState('')
+  const [personaNombre, setPersonaNombre] = useState('')
+  const [personaApellido, setPersonaApellido] = useState('')
+  const [personaDni, setPersonaDni] = useState('')
+  const [mensajeInv, setMensajeInv] = useState('')
+
+  const [emailCuerpo, setEmailCuerpo] = useState('')
+  const [rolCuerpo, setRolCuerpo] = useState('TECNICO')
+  const [mensajeCuerpo, setMensajeCuerpo] = useState('')
+
+  const recargar = useCallback(async () => {
+    const data = await apiFetch<InvitacionEquipo[]>(`/equipos/${equipoId}/invitaciones`)
+    setInvitaciones(data)
+  }, [equipoId])
+
+  useEffect(() => {
+    let activo = true
+    apiFetch<InvitacionEquipo[]>(`/equipos/${equipoId}/invitaciones`)
+      .then((data) => {
+        if (activo) setInvitaciones(data)
+      })
+      .catch((err) => {
+        if (activo) setError(err instanceof Error ? err.message : 'No se pudieron cargar las invitaciones')
+      })
+      .finally(() => {
+        if (activo) setCargando(false)
+      })
+    return () => {
+      activo = false
+    }
+  }, [equipoId])
+
+  async function invitarJugador(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setMensaje(null)
+    try {
+      await apiFetch(`/equipos/${equipoId}/invitaciones-jugador`, {
+        method: 'POST',
+        body: JSON.stringify(
+          jugadorId
+            ? { jugadorId, mensaje: mensajeInv || undefined }
+            : { persona: { nombre: personaNombre, apellido: personaApellido, dni: personaDni || undefined }, mensaje: mensajeInv || undefined },
+        ),
+      })
+      setMensaje('Invitación enviada')
+      setJugadorId('')
+      setPersonaNombre('')
+      setPersonaApellido('')
+      setPersonaDni('')
+      setMensajeInv('')
+      await recargar()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo enviar la invitación')
+    }
+  }
+
+  async function invitarCuerpo(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setMensaje(null)
+    try {
+      const res = await apiFetch<{ existe: boolean }>(`/equipos/${equipoId}/invitaciones-cuerpo`, {
+        method: 'POST',
+        body: JSON.stringify({ email: emailCuerpo, rolEnEquipo: rolCuerpo, mensaje: mensajeCuerpo || undefined }),
+      })
+      setMensaje(res.existe ? 'Invitación enviada' : 'No existe una cuenta con ese email')
+      setEmailCuerpo('')
+      setMensajeCuerpo('')
+      await recargar()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo enviar la invitación')
+    }
+  }
+
+  async function revocar(id: string) {
+    setError(null)
+    setMensaje(null)
+    try {
+      await apiFetch(`/invitaciones/${id}/revocar`, { method: 'POST' })
+      setMensaje('Invitación revocada')
+      await recargar()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo revocar la invitación')
+    }
+  }
+
+  return (
+    <>
+      {(puedeInvitarJugador || puedeInvitarCuerpo) && (
+        <div className="grid">
+          {puedeInvitarJugador && (
+            <div className="tarjeta">
+              <h3>Invitar jugador</h3>
+              <form onSubmit={invitarJugador}>
+                <div className="campo">
+                  <label htmlFor="ij-id">Jugador existente (ID) o vacío para crear persona nueva</label>
+                  <input id="ij-id" value={jugadorId} onChange={(e) => setJugadorId(e.target.value)} placeholder="uuid del jugador" />
+                </div>
+                <div className="campo">
+                  <label htmlFor="ij-nombre">Nombre (persona nueva)</label>
+                  <input id="ij-nombre" value={personaNombre} onChange={(e) => setPersonaNombre(e.target.value)} />
+                </div>
+                <div className="campo">
+                  <label htmlFor="ij-apellido">Apellido (persona nueva)</label>
+                  <input id="ij-apellido" value={personaApellido} onChange={(e) => setPersonaApellido(e.target.value)} />
+                </div>
+                <div className="campo">
+                  <label htmlFor="ij-dni">DNI (opcional)</label>
+                  <input id="ij-dni" value={personaDni} onChange={(e) => setPersonaDni(e.target.value)} />
+                </div>
+                <div className="campo">
+                  <label htmlFor="ij-mensaje">Mensaje (opcional)</label>
+                  <input id="ij-mensaje" value={mensajeInv} onChange={(e) => setMensajeInv(e.target.value)} />
+                </div>
+                <button className="boton boton-primario" type="submit">
+                  Invitar jugador
+                </button>
+              </form>
+            </div>
+          )}
+          {puedeInvitarCuerpo && (
+            <div className="tarjeta">
+              <h3>Invitar al cuerpo técnico</h3>
+              <form onSubmit={invitarCuerpo}>
+                <div className="campo">
+                  <label htmlFor="ic-email">Email</label>
+                  <input id="ic-email" type="email" value={emailCuerpo} onChange={(e) => setEmailCuerpo(e.target.value)} required />
+                </div>
+                <div className="campo">
+                  <label htmlFor="ic-rol">Rol</label>
+                  <select id="ic-rol" value={rolCuerpo} onChange={(e) => setRolCuerpo(e.target.value)}>
+                    <option value="DELEGADO">DELEGADO</option>
+                    <option value="TECNICO">TECNICO</option>
+                    <option value="AUXILIAR">AUXILIAR</option>
+                  </select>
+                </div>
+                <div className="campo">
+                  <label htmlFor="ic-mensaje">Mensaje (opcional)</label>
+                  <input id="ic-mensaje" value={mensajeCuerpo} onChange={(e) => setMensajeCuerpo(e.target.value)} />
+                </div>
+                <button className="boton boton-primario" type="submit">
+                  Invitar
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="tarjeta">
+        <h3>Historial de invitaciones</h3>
+        {error && <p className="error">{error}</p>}
+        {mensaje && <p className="mensaje">{mensaje}</p>}
+        {cargando && <p>Cargando…</p>}
+        {!cargando && invitaciones.length === 0 && <p className="mensaje">Sin invitaciones.</p>}
+        {!cargando && invitaciones.length > 0 && (
+          <ul className="lista">
+            {invitaciones.map((inv) => (
+              <li key={inv.id}>
+                {inv.destinatario ? `${inv.destinatario.nombre ?? ''} ${inv.destinatario.apellido ?? ''}`.trim() : '—'} ·{' '}
+                {inv.tipo === 'JUGADOR' ? 'jugador' : `cuerpo técnico (${inv.rolEnEquipo ?? '—'})`} ·{' '}
+                <span className="estado">{inv.estado}</span>
+                {' '}· {new Date(inv.createdAt).toLocaleDateString()}
+                {inv.estado === 'PENDIENTE' && (
+                  <>
+                    {' '}
+                    <button className="boton" onClick={() => void revocar(inv.id)}>
+                      Revocar
+                    </button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
   )
 }

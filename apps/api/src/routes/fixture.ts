@@ -6,6 +6,7 @@ import { esAdminDeTorneo, puedeVerTorneo } from '../auth/permisos.js'
 import { badRequest, conflicto, noEncontrado, prohibido } from '../http.js'
 import { auditar } from '../auth/auditoria.js'
 import { cargarCompetencia, calcularTabla, equiposConfirmados, generarFixture, leerReglas, validarCantidad } from '../fixture/servicio.js'
+import { notificarDelegadosEquipos } from '../notificaciones/servicio.js'
 
 interface FixtureBody { zonaId?: string | null; confirmar?: boolean }
 
@@ -38,13 +39,14 @@ export async function fixtureRoutes(app: FastifyInstance): Promise<void> {
     const tc = await competenciaConPermiso(id, auth); const formato = tc.configuracion?.formato
     const ruedas = formato === 'DOS_RUEDAS' ? 2 : 1
     const data = await generarFixture(getPrisma(), { torneoCategoriaId: id, zonaId: body.zonaId ?? null, ruedas, usuarioId: auth.usuarioId, regenerar: false })
+    await notificarDelegadosEquipos(getPrisma(), data.equipos.map((e) => e.id), { tipo: 'FIXTURE', titulo: 'Fixture generado', mensaje: 'Se generó el fixture de la competición', entidadTipo: 'Fixture', entidadId: id }, auth.usuarioId)
     return { data }
   })
   app.post('/torneo-categorias/:id/fixture/regenerar', { preHandler: requierePermiso(PERMISOS.torneosAdministrar) }, async (request) => {
     const auth = getAuth(request); const { id } = request.params as { id: string }; const body = request.body as FixtureBody
     if (body.confirmar !== true) throw badRequest('La regeneración requiere confirmar: true')
     const tc = await competenciaConPermiso(id, auth); const ruedas = tc.configuracion?.formato === 'DOS_RUEDAS' ? 2 : 1
-    try { return { data: await generarFixture(getPrisma(), { torneoCategoriaId: id, zonaId: body.zonaId ?? null, ruedas, usuarioId: auth.usuarioId, regenerar: true }) } } catch (error) { if (error instanceof Error && 'code' in error && (error as { code?: string }).code === 'fixture_bloqueado') await auditar(getPrisma(), { entidad: 'Fixture', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { operacion: 'regenerar_rechazada' } }); throw error }
+    try { const data = await generarFixture(getPrisma(), { torneoCategoriaId: id, zonaId: body.zonaId ?? null, ruedas, usuarioId: auth.usuarioId, regenerar: true }); await notificarDelegadosEquipos(getPrisma(), data.equipos.map((e) => e.id), { tipo: 'FIXTURE', titulo: 'Fixture regenerado', mensaje: 'Se regeneró el fixture de la competición', entidadTipo: 'Fixture', entidadId: id }, auth.usuarioId); return { data } } catch (error) { if (error instanceof Error && 'code' in error && (error as { code?: string }).code === 'fixture_bloqueado') await auditar(getPrisma(), { entidad: 'Fixture', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { operacion: 'regenerar_rechazada' } }); throw error }
   })
   app.get('/torneo-categorias/:id/fixture', { preHandler: requierePermiso(PERMISOS.torneosVer) }, async (request) => {
     const auth = getAuth(request); const { id } = request.params as { id: string }; const query = request.query as { zonaId?: string }

@@ -11,6 +11,7 @@ import type { ContextoAuth } from '../auth/contexto.js'
 import type { PrismaClient } from '../generated/prisma/client.js'
 import type { EstadoPartido } from '../generated/prisma/enums.js'
 import { validarGoles } from './eventos-partido.js'
+import { notificarMiembrosEquipos } from '../notificaciones/servicio.js'
 
 interface CrearPartidoBody {
   tipo: string
@@ -184,7 +185,7 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string }
     const body = request.body as ModificarBody
     const prisma = getPrisma()
-    const p = await prisma.partido.findUnique({ where: { id }, select: { id: true, estado: true, tipo: true, torneoId: true, equipoResponsableId: true, equipoLocalId: true } })
+    const p = await prisma.partido.findUnique({ where: { id }, select: { id: true, estado: true, tipo: true, torneoId: true, equipoResponsableId: true, equipoLocalId: true, equipoVisitanteId: true } })
     if (!p) throw noEncontrado('Partido')
     if (p.estado !== 'PROGRAMADO' && p.estado !== 'APLAZADO') throw badRequest('Solo se puede modificar un partido programado o aplazado')
     if (!(await puedeGestionar(prisma, auth, p))) throw prohibido('No tenés permiso para modificar ese partido')
@@ -197,6 +198,23 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
         arbitro: body.arbitro !== undefined ? body.arbitro.trim() || null : undefined,
       },
     })
+    if (body.fechaHora !== undefined || body.lugar !== undefined) {
+      const equipos = [p.equipoLocalId, p.equipoVisitanteId].filter((e): e is string => Boolean(e))
+      if (equipos.length > 0) {
+        await notificarMiembrosEquipos(
+          prisma,
+          equipos,
+          {
+            tipo: 'PARTIDO',
+            titulo: 'Partido modificado',
+            mensaje: 'Se actualizaron la fecha o el lugar de un partido de tu equipo',
+            entidadTipo: 'Partido',
+            entidadId: id,
+          },
+          auth.usuarioId,
+        )
+      }
+    }
     await auditar(prisma, { entidad: 'Partido', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { campos: Object.keys(body) } })
     return { data: actualizado }
   })

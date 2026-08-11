@@ -80,3 +80,15 @@ export interface FichaJugador {
     activo: boolean
   }>
 }
+
+export interface InvitacionEquipo {
+  id: string
+  tipo: 'JUGADOR' | 'CUERPO_TECNICO'
+  estado: 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA' | 'EXPIRADA' | 'REVOCADA'
+  rolEnEquipo: string | null
+  mensaje: string | null
+  expiraEn: string | null
+  respondidoEn: string | null
+  createdAt: string
+  destinatario: { nombre: string | null; apellido: string | null } | null
+}

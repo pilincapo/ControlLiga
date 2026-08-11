@@ -169,6 +169,32 @@ enum AccionAuditoria {
   DELETE
 }
 
+enum EstadoInvitacion {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+  EXPIRADA
+  REVOCADA
+}
+
+enum TipoInvitacion {
+  JUGADOR
+  CUERPO_TECNICO
+}
+
+enum TipoNotificacion {
+  INVITACION_JUGADOR
+  INVITACION_CUERPO_TECNICO
+  INVITACION_TORNEO
+  SOLICITUD_TORNEO
+  RESPUESTA_INVITACION
+  CONVOCATORIA
+  PARTIDO
+  FIXTURE
+  SANCION
+  EQUIPO
+}
+
 // ---------- USUARIOS Y ROLES ----------
 
 model Usuario {
@@ -191,6 +217,10 @@ model Usuario {
   sesiones               Session[]
   passwordResetTokens    PasswordResetToken[]
   participacionesInvitadas EquipoParticipacion[] @relation("EquipoParticipacionInvitador")
+  invitacionesCuerpoTecnico Invitacion[]          @relation("InvitacionUsuario")
+  invitacionesCreadas     Invitacion[]           @relation("InvitacionCreador")
+  invitacionesDecididas   Invitacion[]           @relation("InvitacionDecisor")
+  notificaciones          Notificacion[]
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 
@@ -266,6 +296,7 @@ model Jugador {
   eventos          EventoPartido[] @relation("EventoJugador")
   eventosRelacionados EventoPartido[] @relation("EventoJugadorRelacionado")
   movimientosCaja  MovimientoCaja[]
+  invitaciones     Invitacion[]       @relation("InvitacionJugador")
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   rolUsuarios      RolUsuario[]
@@ -303,6 +334,7 @@ model Equipo {
   eventosPartido      EventoPartido[]
   rolesUsuarios       RolUsuario[]
   descansos           JornadaEquipoDescanso[]
+  invitaciones        Invitacion[]            @relation("InvitacionEquipo")
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 
@@ -343,6 +375,8 @@ model EquipoJugador {
   observaciones String?
   formaciones   FormacionJugador[]
   convocatorias ConvocatoriaJugador[]
+  invitacionId  String?               @unique @db.Uuid
+  invitacion    Invitacion?           @relation(fields: [invitacionId], references: [id])
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
 
@@ -872,4 +906,52 @@ model AuditoriaLog {
   @@index([entidad, entidadId])
   @@index([usuarioId])
   @@map("auditoria_log")
+}
+
+// ---------- INVITACIONES ----------
+
+model Invitacion {
+  id            String            @id @default(uuid()) @db.Uuid
+  tipo          TipoInvitacion
+  equipoId      String            @db.Uuid
+  equipo        Equipo            @relation("InvitacionEquipo", fields: [equipoId], references: [id])
+  jugadorId     String?           @db.Uuid
+  jugador       Jugador?          @relation("InvitacionJugador", fields: [jugadorId], references: [id])
+  usuarioId     String?           @db.Uuid
+  usuario       Usuario?          @relation("InvitacionUsuario", fields: [usuarioId], references: [id])
+  rolEnEquipo   RolEnEquipo?
+  estado        EstadoInvitacion  @default(PENDIENTE)
+  mensaje       String?
+  expiraEn      DateTime?
+  creadoPorId   String?           @db.Uuid
+  creadoPor     Usuario?          @relation("InvitacionCreador", fields: [creadoPorId], references: [id])
+  respondidoEn  DateTime?
+  decididoPorId String?           @db.Uuid
+  decididoPor   Usuario?          @relation("InvitacionDecisor", fields: [decididoPorId], references: [id])
+  equipoJugador EquipoJugador?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([equipoId, estado])
+  @@index([usuarioId, estado])
+  @@index([jugadorId, estado])
+  @@map("invitaciones")
+}
+
+// ---------- NOTIFICACIONES ----------
+
+model Notificacion {
+  id          String            @id @default(uuid()) @db.Uuid
+  usuarioId   String            @db.Uuid
+  usuario     Usuario           @relation(fields: [usuarioId], references: [id])
+  tipo        TipoNotificacion
+  titulo      String
+  mensaje     String
+  entidadTipo String?
+  entidadId   String?
+  leidaAt     DateTime?
+  createdAt   DateTime          @default(now())
+
+  @@index([usuarioId, leidaAt, createdAt])
+  @@map("notificaciones")
 }

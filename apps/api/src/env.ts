@@ -22,4 +22,5 @@ export const env = {
   EMAIL_FROM: process.env.EMAIL_FROM ?? 'no-reply@controlliga.local',
   PASSWORD_RATE_LIMIT_MAX: Number(process.env.PASSWORD_RATE_LIMIT_MAX ?? 5),
   PASSWORD_RATE_LIMIT_WINDOW_MS: Number(process.env.PASSWORD_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
+  INVITACION_TTL_HORAS: Number(process.env.INVITACION_TTL_HORAS ?? 168),
 }

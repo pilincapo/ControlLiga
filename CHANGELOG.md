@@ -2,6 +2,22 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.13.0] - 2026-08-11
+
+### Agregado
+
+- **FASE 13 — Invitaciones y notificaciones**, diseñada en `docs/fase-13-diseno-invitaciones-notificaciones.md`.
+- Migración `fase13_invitaciones_notificaciones`: modelos `Invitacion` y `Notificacion`, enums `EstadoInvitacion`, `TipoInvitacion` y `TipoNotificacion`, y columna `equipo_jugador.invitacionId`.
+- Invitaciones de jugador (existente o persona nueva) y de cuerpo técnico por email exacto, con TTL configurable (`INVITACION_TTL_HORAS`, 168 h por defecto) y expiración lazy sin cron.
+- Aceptación/rechazo/revocación con permisos por rol de equipo, estados de plantel y membresía; historial por equipo y lista propia `/invitaciones/mias`; sin exponer email, DNI ni teléfono en listados.
+- Notificaciones en base con deep-link (`entidadTipo`/`entidadId`), listado con filtros y paginación, contador de no leídas, marcar una/todas leídas; deduplicación por usuario y exclusión del actor.
+- Hooks de notificación en participaciones (invitación y solicitud de torneo, respuestas), convocatorias (crear/publicar), fixture (generar/regenerar) y partidos (cambio de fecha o lugar), sin cambiar contratos existentes.
+- Rutas `GET /equipos/:id` recalibran el plantel separando `cantidades.invitados` de `cantidades.jugadores`.
+
+### Tests
+
+- 23 escenarios de invitaciones y 10 de notificaciones HTTP/integración (permisos, duplicados, expiración lazy, privacidad, deduplicación y scoping entre usuarios).
+
 ## [0.12.0] - 2026-08-11
 
 ### Agregado

@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth'
 import { apiFetch } from '../utils/api'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
+import InvitacionesPendientes from './invitaciones/InvitacionesPendientes'
 
 export default function ProfilePage() {
   const { usuario, vincularJugador } = useAuth()
@@ -66,6 +67,8 @@ export default function ProfilePage() {
         <p>{usuario.email}</p>
         <p>Jugador vinculado: {usuario.jugadorId ?? 'No'}</p>
       </div>
+
+      <InvitacionesPendientes />
 
       <div className="tarjeta">
         <h3>Roles</h3>

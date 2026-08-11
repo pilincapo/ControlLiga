@@ -23,6 +23,7 @@ body {
 
 .navbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1.5rem;
@@ -168,4 +169,114 @@ body {
 @media (max-width: 640px) {
   .portal-encabezado { align-items: flex-start; flex-direction: column; margin-bottom: 2.5rem; }
   .portal-acciones { width: 100%; justify-content: space-between; }
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tabs .activo {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.badge {
+  display: inline-block;
+  min-width: 1.25rem;
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  text-align: center;
+  margin-left: 0.375rem;
+}
+
+.notificaciones-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.notificaciones-lista {
+  list-style: none;
+  padding-left: 0;
+}
+
+.notificacion-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notificacion-dot {
+  flex-shrink: 0;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-top: 0.25rem;
+  border-radius: 50%;
+}
+
+.notificacion-dot.noleida {
+  background: #2563eb;
+}
+
+.notificacion-dot.leida {
+  background: #d1d5db;
+}
+
+.notificacion-cuerpo {
+  flex: 1;
+}
+
+.estado {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.estado.pendiente {
+  background: #fff3cd;
+  color: #8a6d3b;
+}
+
+.estado.aceptada,
+.estado.activo,
+.estado.inscripto,
+.estado.confirmado {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.estado.rechazada,
+.estado.expirada,
+.estado.revocada,
+.estado.baja,
+.estado.cancelada {
+  background: #fde4e4;
+  color: #b00020;
 }

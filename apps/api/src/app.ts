@@ -9,6 +9,8 @@ import { healthRoutes } from './routes/health.js'
 import { authRoutes } from './routes/auth.js'
 import { usuariosRoutes } from './routes/usuarios.js'
 import { equiposRoutes } from './routes/equipos.js'
+import { invitacionesRoutes } from './routes/invitaciones.js'
+import { notificacionesRoutes } from './routes/notificaciones.js'
 import { jugadoresRoutes } from './routes/jugadores.js'
 import { equipoJugadoresRoutes } from './routes/equipo-jugadores.js'
 import { organizacionesRoutes } from './routes/organizaciones.js'
@@ -61,6 +63,8 @@ export function buildApp() {
   app.register(authRoutes, { prefix: '/api' })
   app.register(usuariosRoutes, { prefix: '/api' })
   app.register(equiposRoutes, { prefix: '/api' })
+  app.register(invitacionesRoutes, { prefix: '/api' })
+  app.register(notificacionesRoutes, { prefix: '/api' })
   app.register(jugadoresRoutes, { prefix: '/api' })
   app.register(equipoJugadoresRoutes, { prefix: '/api' })
   app.register(organizacionesRoutes, { prefix: '/api' })

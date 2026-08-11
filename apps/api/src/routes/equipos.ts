@@ -146,8 +146,9 @@ export async function equiposRoutes(app: FastifyInstance): Promise<void> {
     if (!equipo) {
       throw noEncontrado('Equipo')
     }
-    const plantelActivo = equipo.jugadores.filter((j) => j.estado !== EstadoEquipoJugador.BAJA).length
-    const bajas = equipo.jugadores.length - plantelActivo
+    const plantelActivo = equipo.jugadores.filter((j) => j.estado !== EstadoEquipoJugador.BAJA && j.estado !== EstadoEquipoJugador.INVITADO).length
+    const invitados = equipo.jugadores.filter((j) => j.estado === EstadoEquipoJugador.INVITADO).length
+    const bajas = equipo.jugadores.length - plantelActivo - invitados
     return {
       data: {
         id: equipo.id,
@@ -165,6 +166,7 @@ export async function equiposRoutes(app: FastifyInstance): Promise<void> {
         administradores: equipo.usuarios,
         cantidades: {
           jugadores: plantelActivo,
+          invitados,
           bajas,
           administradores: equipo.usuarios.length,
           delegados: equipo.usuarios.filter((u) => u.rolEnEquipo === 'DELEGADO').length,

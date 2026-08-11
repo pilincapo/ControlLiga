@@ -20,6 +20,8 @@ export async function limpiarBase(): Promise<void> {
       prisma.formacionInstancia.deleteMany(),
       prisma.movimientoCaja.deleteMany(),
       prisma.sancion.deleteMany(),
+      prisma.notificacion.deleteMany(),
+      prisma.invitacion.deleteMany(),
       prisma.equipoUsuario.deleteMany(),
       prisma.equipoJugador.deleteMany(),
       prisma.jugadorParticipacion.deleteMany(),

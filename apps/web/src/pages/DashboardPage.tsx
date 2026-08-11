@@ -3,6 +3,9 @@ import { PERMISOS, ROL_PUBLICO } from '@controlliga/shared'
 import type { Permiso } from '@controlliga/shared'
 import Layout from '../components/Layout'
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { cargarNoLeidas, EVENTO_NOTIFICACIONES_ACTUALIZADAS } from '../utils/notificaciones'
+import InvitacionesPendientes from './invitaciones/InvitacionesPendientes'
 
 interface Seccion {
   titulo: string
@@ -28,6 +31,17 @@ const SECCIONES: Seccion[] = [
 
 export default function DashboardPage() {
   const { usuario } = useAuth()
+  const [noLeidas, setNoLeidas] = useState(0)
+
+  useEffect(() => {
+    const refrescar = () => {
+      cargarNoLeidas().then(setNoLeidas).catch(() => setNoLeidas(0))
+    }
+    refrescar()
+    window.addEventListener(EVENTO_NOTIFICACIONES_ACTUALIZADAS, refrescar)
+    return () => window.removeEventListener(EVENTO_NOTIFICACIONES_ACTUALIZADAS, refrescar)
+  }, [])
+
   if (!usuario) {
     return null
   }
@@ -71,6 +85,19 @@ export default function DashboardPage() {
           </ul>
         </div>
       )}
+      <div className="tarjeta">
+        <h3>Notificaciones</h3>
+        <p>
+          {noLeidas > 0 ? (
+            <Link className="enlace" to="/notificaciones">
+              Tenés {noLeidas} notificación{noLeidas !== 1 ? 'es' : ''} sin leer
+            </Link>
+          ) : (
+            <span>No tenés notificaciones sin leer.</span>
+          )}
+        </p>
+      </div>
+      <InvitacionesPendientes />
     </Layout>
   )
 }

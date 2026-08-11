@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from '../auth/useAuth'
+import NotificacionesBadge from './NotificacionesBadge'
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { usuario, logout } = useAuth()
@@ -16,6 +17,8 @@ export default function Layout({ children }: { children: ReactNode }) {
         <Link to="/formaciones">Formaciones</Link>
         <Link to="/convocatorias">Convocatorias</Link>
         <Link to="/partidos">Partidos</Link>
+        <Link to="/invitaciones">Invitaciones</Link>
+        <NotificacionesBadge />
         <Link to="/profile">Perfil</Link>
         {nombre && <span>{nombre}</span>}
         <button className="boton" onClick={() => void logout()}>

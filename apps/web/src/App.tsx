@@ -16,6 +16,8 @@ import ConvocatoriasPage from './pages/convocatorias/ConvocatoriasPage'
 import ConvocatoriaPage from './pages/convocatorias/ConvocatoriaPage'
 import PartidosPage from './pages/partidos/PartidosPage'
 import PartidoPage from './pages/partidos/PartidoPage'
+import InvitacionesPage from './pages/invitaciones/InvitacionesPage'
+import NotificacionesPage from './pages/notificaciones/NotificacionesPage'
 import PublicPortalPage from './pages/PublicPortalPage'
 import PublicResourcePage from './pages/PublicResourcePage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
@@ -142,6 +144,8 @@ function App() {
           />
           <Route path="/partidos" element={<RequireAuth><PartidosPage /></RequireAuth>} />
           <Route path="/partidos/:id" element={<RequireAuth><PartidoPage /></RequireAuth>} />
+          <Route path="/invitaciones" element={<RequireAuth><InvitacionesPage /></RequireAuth>} />
+          <Route path="/notificaciones" element={<RequireAuth><NotificacionesPage /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
