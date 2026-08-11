@@ -189,6 +189,7 @@ model Usuario {
   eventosPartidoCreados EventoPartido[] @relation("EventoPartidoCreador")
   auditoriaLogs          AuditoriaLog[]
   sesiones               Session[]
+  passwordResetTokens    PasswordResetToken[]
   participacionesInvitadas EquipoParticipacion[] @relation("EquipoParticipacionInvitador")
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
@@ -840,6 +841,20 @@ model Session {
 
   @@index([usuarioId])
   @@map("sesiones")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  usuarioId  String    @db.Uuid
+  usuario    Usuario   @relation(fields: [usuarioId], references: [id])
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([usuarioId, expiresAt])
+  @@map("password_reset_tokens")
 }
 
 // ---------- AUDITORIA ----------

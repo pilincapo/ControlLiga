@@ -2,6 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.12.0] - 2026-08-11
+
+### Agregado
+
+- **FASE 12 — Recuperación y hardening de autenticación**: tokens de recuperación persistidos como hash SHA-256, TTL configurable, EmailSender, rate limiter en memoria, reset/cambio de contraseña, revocación de sesiones, auditoría y frontend responsive básico.
+- Política central de contraseñas de 8 a 128 caracteres compartida por registro, reset y cambio.
+- Migración `fase12_password_reset` y 20 escenarios de seguridad/auth.
+
 ## [0.11.0] - 2026-08-11
 
 ### Agregado

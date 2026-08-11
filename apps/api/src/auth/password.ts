@@ -13,6 +13,14 @@ const BLOCK_SIZE = 8
 const PARALLEL = 1
 const KEY_LENGTH = 64
 const MAX_MEM = 128 * 1024 * 1024
+export const PASSWORD_MIN_LENGTH = 8
+export const PASSWORD_MAX_LENGTH = 128
+
+export function validarPoliticaPassword(password: string): string | null {
+  if (password.length < PASSWORD_MIN_LENGTH) return `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres`
+  if (password.length > PASSWORD_MAX_LENGTH) return `La contraseña no puede superar ${PASSWORD_MAX_LENGTH} caracteres`
+  return null
+}
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString('base64url')

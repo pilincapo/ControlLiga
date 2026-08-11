@@ -12,6 +12,9 @@ import {
 } from '../auth/servicio.js'
 import { autenticar, getAuth } from '../plugins/auth.js'
 import { noAutenticado } from '../http.js'
+import { autenticar as autenticarPassword } from '../plugins/auth.js'
+import { cambiarPassword, resetearPassword, solicitarReset, resetRateLimitado } from '../auth/password-reset.js'
+import { demasiadasSolicitudes } from '../http.js'
 
 interface RegistroBody {
   email: string
@@ -31,6 +34,10 @@ interface VincularBody {
   jugadorId: string
   dni?: string
 }
+
+interface ForgotBody { email: string }
+interface ResetBody { token: string; password: string }
+interface ChangePasswordBody { passwordActual: string; passwordNueva: string }
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post('/auth/register', async (request, reply) => {
@@ -73,5 +80,29 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const body = request.body as VincularBody
     const usuario = await vincularJugador(auth, body.jugadorId, body.dni)
     return { data: aMeResponder(usuario) }
+  })
+
+  app.post('/auth/password/forgot', async (request, reply) => {
+    const body = request.body as ForgotBody
+    await solicitarReset(typeof body?.email === 'string' ? body.email : '', request)
+    return reply.status(202).send({ data: { mensaje: 'Si existe una cuenta, recibirás instrucciones para recuperar tu contraseña' } })
+  })
+
+  app.post('/auth/password/reset', async (request, reply) => {
+    const body = request.body as ResetBody
+    if (typeof body?.token !== 'string' || typeof body?.password !== 'string') {
+      throw noAutenticado()
+    }
+    if (!resetRateLimitado(body.token, request)) throw demasiadasSolicitudes()
+    await resetearPassword(body.token, body.password)
+    return reply.send({ data: { mensaje: 'Contraseña actualizada. Iniciá sesión nuevamente' } })
+  })
+
+  app.post('/auth/password/change', { preHandler: autenticarPassword }, async (request, reply) => {
+    const body = request.body as ChangePasswordBody
+    const auth = getAuth(request)
+    await cambiarPassword(auth.usuarioId, body.passwordActual, body.passwordNueva)
+    clearSessionCookie(reply)
+    return reply.send({ data: { mensaje: 'Contraseña actualizada. Iniciá sesión nuevamente' } })
   })
 }

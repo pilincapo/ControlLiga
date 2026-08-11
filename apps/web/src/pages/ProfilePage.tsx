@@ -1,14 +1,19 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../auth/useAuth'
+import { apiFetch } from '../utils/api'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 
 export default function ProfilePage() {
   const { usuario, vincularJugador } = useAuth()
+  const navigate = useNavigate()
   const [jugadorId, setJugadorId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [mensaje, setMensaje] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [passwordActual, setPasswordActual] = useState('')
+  const [passwordNueva, setPasswordNueva] = useState('')
 
   if (!usuario) {
     return null
@@ -30,9 +35,30 @@ export default function ProfilePage() {
     }
   }
 
+  async function onCambiarPassword(e: FormEvent) {
+    e.preventDefault()
+    setError(null); setMensaje(null); setEnviando(true)
+    try {
+      await apiFetch('/auth/password/change', { method: 'POST', body: JSON.stringify({ passwordActual, passwordNueva }) })
+      navigate('/login', { replace: true })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cambiar la contraseña')
+    } finally { setEnviando(false) }
+  }
+
   return (
     <Layout>
       <h2>Mi perfil</h2>
+      <div className="tarjeta">
+        <h3>Cambiar contraseña</h3>
+        {error && <p className="error">{error}</p>}
+        <form onSubmit={onCambiarPassword}>
+          <div className="campo"><label htmlFor="passwordActual">Contraseña actual</label><input id="passwordActual" type="password" value={passwordActual} onChange={(e) => setPasswordActual(e.target.value)} required /></div>
+          <div className="campo"><label htmlFor="passwordNueva">Nueva contraseña</label><input id="passwordNueva" type="password" value={passwordNueva} onChange={(e) => setPasswordNueva(e.target.value)} required /></div>
+          <button className="boton boton-primario" type="submit" disabled={enviando}>Cambiar contraseña</button>
+        </form>
+      </div>
+
       <div className="tarjeta">
         <p>
           <strong>{usuario.nombre} {usuario.apellido}</strong>

@@ -11,6 +11,7 @@ export async function limpiarBase(): Promise<void> {
   try {
     await prisma.$transaction([
       prisma.auditoriaLog.deleteMany(),
+      prisma.passwordResetToken.deleteMany(),
       prisma.session.deleteMany(),
       prisma.rolUsuario.deleteMany(),
       prisma.convocatoriaJugador.deleteMany(),

@@ -2,7 +2,7 @@ import type { FastifyRequest } from 'fastify'
 import { env } from '../env.js'
 import { getPrisma } from '../db.js'
 import { conflicto, noAutenticado, noEncontrado, badRequest } from '../http.js'
-import { hashPassword, verifyPassword } from './password.js'
+import { hashPassword, validarPoliticaPassword, verifyPassword } from './password.js'
 import { generarTokenSesion, hashTokenSesion } from './sesiones.js'
 import { aContextoAuth, aUsuarioSesion, INCLUDE_USUARIO_SESION } from './contexto.js'
 import type { ContextoAuth, UsuarioSesionPayload } from './contexto.js'
@@ -37,10 +37,10 @@ export async function crearSesion(
   prisma: PrismaClient,
   usuarioId: string,
   meta: MetaConexion,
-): Promise<{ token: string; expiresAt: Date }> {
+): Promise<{ id: string; token: string; expiresAt: Date }> {
   const token = generarTokenSesion()
   const expiresAt = new Date(Date.now() + env.SESSION_TTL_MS)
-  await prisma.session.create({
+  const sesion = await prisma.session.create({
     data: {
       usuarioId,
       tokenHash: hashTokenSesion(token),
@@ -49,7 +49,7 @@ export async function crearSesion(
       expiresAt,
     },
   })
-  return { token, expiresAt }
+  return { token, expiresAt, id: sesion.id }
 }
 
 export async function validarSesion(request: FastifyRequest): Promise<ContextoAuth | null> {
@@ -137,8 +137,9 @@ export async function registrarUsuario(datos: {
   if (apellido.length < 2) {
     throw badRequest('El apellido es obligatorio')
   }
-  if (datos.password.length < 8) {
-    throw badRequest('La contraseña debe tener al menos 8 caracteres')
+  const errorPassword = validarPoliticaPassword(datos.password)
+  if (errorPassword) {
+    throw badRequest(errorPassword)
   }
 
   const prisma = getPrisma()
@@ -237,7 +238,7 @@ export async function iniciarSesion(datos: { email: string; password: string }, 
   const sesion = await crearSesion(prisma, usuario.id, metaDe(request))
   await auditar(prisma, {
     entidad: 'Sesion',
-    entidadId: sesion.token,
+      entidadId: sesion.id,
     accion: 'CREATE',
     usuarioId: usuario.id,
     cambios: { tipo: 'login', ip: metaDe(request).ip ?? null },
@@ -247,12 +248,11 @@ export async function iniciarSesion(datos: { email: string; password: string }, 
 
 export async function cerrarSesion(request: FastifyRequest): Promise<void> {
   const prisma = getPrisma()
-  const token = tokenDeCookie(request)
   const revocada = await revocarSesionActual(request)
-  if (revocada && token) {
+  if (revocada) {
     await auditar(prisma, {
       entidad: 'Sesion',
-      entidadId: token,
+      entidadId: 'sesion-actual',
       accion: 'DELETE',
       usuarioId: request.auth?.usuarioId ?? null,
       cambios: { tipo: 'logout' },

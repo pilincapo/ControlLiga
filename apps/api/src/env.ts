@@ -17,4 +17,9 @@ export const env = {
   COOKIE_SECURE: (process.env.COOKIE_SECURE ?? 'false') === 'true',
   SESSION_COOKIE_NAME: process.env.SESSION_COOKIE_NAME ?? 'cl_session',
   SESSION_TTL_MS: Number(process.env.SESSION_TTL_MS ?? 7 * 24 * 60 * 60 * 1000),
+  PASSWORD_RESET_TTL_MINUTES: Number(process.env.PASSWORD_RESET_TTL_MINUTES ?? 60),
+  PASSWORD_RESET_URL_BASE: process.env.PASSWORD_RESET_URL_BASE ?? 'http://localhost:5173/reset-password',
+  EMAIL_FROM: process.env.EMAIL_FROM ?? 'no-reply@controlliga.local',
+  PASSWORD_RATE_LIMIT_MAX: Number(process.env.PASSWORD_RATE_LIMIT_MAX ?? 5),
+  PASSWORD_RATE_LIMIT_WINDOW_MS: Number(process.env.PASSWORD_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
 }

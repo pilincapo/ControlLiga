@@ -29,3 +29,7 @@ export function noEncontrado(entidad: string): HttpError {
 export function conflicto(code: string, message: string): HttpError {
   return new HttpError(409, code, message)
 }
+
+export function demasiadasSolicitudes(message = 'Demasiadas solicitudes'): HttpError {
+  return new HttpError(429, 'demasiadas_solicitudes', message)
+}

@@ -18,6 +18,8 @@ import PartidosPage from './pages/partidos/PartidosPage'
 import PartidoPage from './pages/partidos/PartidoPage'
 import PublicPortalPage from './pages/PublicPortalPage'
 import PublicResourcePage from './pages/PublicResourcePage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import './index.css'
 
 function App() {
@@ -48,6 +50,8 @@ function App() {
               </PublicOnly>
             }
           />
+          <Route path="/forgot-password" element={<PublicOnly><ForgotPasswordPage /></PublicOnly>} />
+          <Route path="/reset-password" element={<PublicOnly><ResetPasswordPage /></PublicOnly>} />
           <Route
             path="/dashboard"
             element={

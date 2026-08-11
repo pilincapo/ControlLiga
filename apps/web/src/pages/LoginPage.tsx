@@ -50,6 +50,7 @@ export default function LoginPage() {
             ¿No tenés cuenta? Registrate
           </Link>
         </p>
+        <p><Link className="enlace" to="/forgot-password">¿Olvidaste tu contraseña?</Link></p>
       </form>
     </main>
   )
