@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { apiFetch } from '../../utils/api'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../auth/useAuth'
-import type { PartidoDetalle } from './tipos'
+import type { EstadisticasPartido, EventoPartido, PartidoDetalle } from './tipos'
 
 const TRANSICIONES: Record<string, string[]> = {
   PROGRAMADO: ['EN_CURSO', 'SUSPENDIDO', 'APLAZADO'],
@@ -21,10 +21,12 @@ export default function PartidoPage() {
   const [mensaje, setMensaje] = useState<string | null>(null)
   const [gLocal, setGLocal] = useState('')
   const [gVisitante, setGVisitante] = useState('')
+  const [eventos, setEventos] = useState<EventoPartido[]>([])
+  const [estadisticas, setEstadisticas] = useState<EstadisticasPartido | null>(null)
 
-  const recargar = async () => { const d = await apiFetch<PartidoDetalle>(`/partidos/${id}`); setPartido(d) }
+  const recargar = async () => { const d = await apiFetch<PartidoDetalle>(`/partidos/${id}`); setPartido(d); const [e, s] = await Promise.all([apiFetch<EventoPartido[]>(`/partidos/${id}/eventos`), apiFetch<EstadisticasPartido>(`/partidos/${id}/estadisticas`)]); setEventos(e); setEstadisticas(s) }
 
-  useEffect(() => { if (id) { let a = true; apiFetch<PartidoDetalle>(`/partidos/${id}`).then((d) => { if (a) setPartido(d) }).catch((e) => { if (a) setError(e instanceof Error ? e.message : '') }); return () => { a = false } } }, [id])
+  useEffect(() => { if (id) { let a = true; Promise.all([apiFetch<PartidoDetalle>(`/partidos/${id}`), apiFetch<EventoPartido[]>(`/partidos/${id}/eventos`), apiFetch<EstadisticasPartido>(`/partidos/${id}/estadisticas`)]).then(([p, e, s]) => { if (a) { setPartido(p); setEventos(e); setEstadisticas(s) } }).catch((e) => { if (a) setError(e instanceof Error ? e.message : '') }); return () => { a = false } } }, [id])
 
   async function accion(url: string, metodo: string, payload?: unknown, exito?: string) {
     setError(null); setMensaje(null)
@@ -82,6 +84,9 @@ export default function PartidoPage() {
       )}
 
       {partido.torneo && <div className="tarjeta"><h3>Torneo</h3><p>{partido.torneo.nombre} · {partido.temporada?.nombre ?? ''}</p></div>}
+
+      <div className="tarjeta"><h3>Eventos</h3>{eventos.length === 0 ? <p>Sin eventos cargados.</p> : <ul className="lista">{eventos.map((e) => <li key={e.id}>{e.anulado ? 'ANULADO · ' : ''}{e.minuto != null ? `${e.minuto}' ` : ''}{e.tipo} {e.subtipo ?? ''}</li>)}</ul>}</div>
+      <div className="tarjeta"><h3>Estadísticas</h3>{estadisticas?.jugadores.length ? <ul className="lista">{estadisticas.jugadores.map((e) => <li key={e.jugadorId}>{e.jugadorId} · {e.goles} goles · {e.asistencias} asistencias · {e.amarillas} amarillas · {e.rojas} rojas · {e.minutosNoDeterminados ? 'minutos no determinados' : `${e.minutos} minutos`}</li>)}</ul> : <p>Sin estadísticas.</p>}</div>
 
       {partido.formacionInstancias.length > 0 && (
         <div className="tarjeta"><h3>Formaciones</h3>

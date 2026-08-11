@@ -2,6 +2,29 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.9.0] - 2026-08-11
+
+### Agregado
+
+- **FASE 9 — Eventos, estadísticas y disciplina** con diseño definitivo en `docs/fase-9-diseno.md`.
+- Modelo extensible `EventoPartido` y enum mínimo `GOL`, `ASISTENCIA`, `TARJETA`, `SUSTITUCION`; migración y cliente Prisma regenerado.
+- Endpoints protegidos de eventos, corrección auditada, anulación no destructiva y estadísticas bajo demanda por partido, jugador, equipo y torneo/categoría.
+- Validación de pertenencia, estados de plantel, secuencias de sustitución, consistencia entre goles oficiales y eventos al finalizar/publicar, y soporte de partidos independientes fuera de estadísticas oficiales de torneo.
+- Frontend básico de línea temporal y estadísticas en detalle de partido.
+
+### Cambiado
+
+- `FormacionInstancia`, convocatorias canceladas, `EquipoJugador` y `Sancion` permanecen sin mutaciones automáticas; tarjetas no crean sanciones.
+- Partidos finalizados no se reabren; eventos corregidos se auditan y anulan, sin borrado físico.
+- Suite HTTP/integración de FASE 9 y correcciones de minutos por intervalos cerrados, permisos de estadísticas/disciplina y bloqueo de reapertura.
+- FASE 9 registra participación y sustituciones, pero no calcula todavía minutos jugados; los eventos quedan preparados para activarlo posteriormente sin reconstruir históricos.
+
+## [0.8.1] - 2026-08-11
+
+### Cambiado
+
+- Configuración Git del proyecto: hook `post-commit` para subir automáticamente cada commit a `origin` en la rama actual.
+
 ## [0.8.0] - 2026-08-11
 
 ### Agregado

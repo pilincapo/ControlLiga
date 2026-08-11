@@ -156,6 +156,13 @@ enum TipoSancion {
   OTRA
 }
 
+enum TipoEventoPartido {
+  GOL
+  ASISTENCIA
+  TARJETA
+  SUSTITUCION
+}
+
 enum AccionAuditoria {
   CREATE
   UPDATE
@@ -179,6 +186,7 @@ model Usuario {
   equiposCreados         Equipo[]         @relation("EquipoCreador")
   convocatoriasCreadas   Convocatoria[]   @relation("ConvocatoriaCreador")
   movimientosCajaCreados MovimientoCaja[] @relation("CajaCreador")
+  eventosPartidoCreados EventoPartido[] @relation("EventoPartidoCreador")
   auditoriaLogs          AuditoriaLog[]
   sesiones               Session[]
   participacionesInvitadas EquipoParticipacion[] @relation("EquipoParticipacionInvitador")
@@ -254,6 +262,8 @@ model Jugador {
   participaciones  JugadorParticipacion[]
   formacionesInstancias FormacionInstanciaJugador[]
   sanciones        Sancion[]
+  eventos          EventoPartido[] @relation("EventoJugador")
+  eventosRelacionados EventoPartido[] @relation("EventoJugadorRelacionado")
   movimientosCaja  MovimientoCaja[]
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -289,6 +299,7 @@ model Equipo {
   convocatorias       Convocatoria[]
   movimientosCaja     MovimientoCaja[]
   sanciones           Sancion[]
+  eventosPartido      EventoPartido[]
   rolesUsuarios       RolUsuario[]
   descansos           JornadaEquipoDescanso[]
   createdAt           DateTime              @default(now())
@@ -564,6 +575,7 @@ model Partido {
   convocatorias       Convocatoria[]
   formaciones         Formacion[]
   formacionInstancias FormacionInstancia[]
+  eventos             EventoPartido[]
   sanciones           Sancion[]
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
@@ -576,6 +588,34 @@ model Partido {
   @@index([jornadaId])
   @@index([equipoResponsableId, tipo])
   @@map("partidos")
+}
+
+model EventoPartido {
+  id                   String           @id @default(uuid()) @db.Uuid
+  partidoId            String           @db.Uuid
+  partido              Partido          @relation(fields: [partidoId], references: [id])
+  equipoId             String           @db.Uuid
+  equipo               Equipo           @relation(fields: [equipoId], references: [id])
+  jugadorId            String?          @db.Uuid
+  jugador              Jugador?         @relation("EventoJugador", fields: [jugadorId], references: [id])
+  jugadorRelacionadoId String?          @db.Uuid
+  jugadorRelacionado   Jugador?         @relation("EventoJugadorRelacionado", fields: [jugadorRelacionadoId], references: [id])
+  tipo                 TipoEventoPartido
+  minuto               Int?
+  periodo              String?
+  orden                Int              @default(0)
+  subtipo              String?
+  observaciones        String?
+  anulado              Boolean          @default(false)
+  creadoPorId          String?          @db.Uuid
+  creadoPor            Usuario?         @relation("EventoPartidoCreador", fields: [creadoPorId], references: [id])
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([partidoId, minuto, orden])
+  @@index([jugadorId, tipo])
+  @@index([equipoId, tipo])
+  @@map("eventos_partido")
 }
 
 model Sancion {

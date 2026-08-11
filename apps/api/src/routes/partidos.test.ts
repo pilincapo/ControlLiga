@@ -14,6 +14,7 @@ describe('módulo de partidos (FASE 7)', () => {
   let usuarioDelegadoA: { id: string; email: string }
   let usuarioJugador: { id: string; email: string }
   let tokenDelegadoA: string
+  let tokenDelegadoB: string
   let tokenJugador: string
   let equipoA: { id: string }
   let equipoB: { id: string }
@@ -32,7 +33,7 @@ describe('módulo de partidos (FASE 7)', () => {
 
     tokenDelegadoA = (await login(app, usuarioDelegadoA.email, 'contraseña123')).token!
     tokenJugador = (await login(app, usuarioJugador.email, 'contraseña123')).token!
-    const tokenDelegadoB = (await login(app, uDelegadoB.email, 'contraseña123')).token!
+    tokenDelegadoB = (await login(app, uDelegadoB.email, 'contraseña123')).token!
 
     const eqA = await app.inject({ method: 'POST', url: '/api/equipos', payload: { nombre: 'Partido A' }, headers: conCookie(tokenDelegadoA) })
     equipoA = { id: eqA.json().data.id }
@@ -43,6 +44,7 @@ describe('módulo de partidos (FASE 7)', () => {
     const ejX = await getPrisma().equipoJugador.findUnique({ where: { id: jx.json().data.id }, select: { jugadorId: true } })
     await getPrisma().usuario.update({ where: { id: usuarioJugador.id }, data: { jugadorId: ejX!.jugadorId } })
     tokenJugador = (await login(app, usuarioJugador.email, 'contraseña123')).token!
+    await app.inject({ method: 'POST', url: `/api/equipos/${equipoB.id}/jugadores`, payload: { persona: { nombre: 'Jug', apellido: 'Yy', dni: '34000112' }, dorsal: 11 }, headers: conCookie(tokenDelegadoB) })
 
     orgA = await crearOrganizacion('Org Partidos')
     torneoA = await crearTorneo(orgA.id, 'Torneo Partidos', { estado: 'INSCRIPCIONES' })
@@ -56,6 +58,14 @@ describe('módulo de partidos (FASE 7)', () => {
   })
 
   afterAll(async () => { await app.close(); await limpiarBase() })
+
+  async function cargarGoles(partidoId: string, local: number, visitante: number): Promise<void> {
+    const jugadores = await getPrisma().equipoJugador.findMany({ where: { equipoId: { in: [equipoA.id, equipoB.id] } }, select: { equipoId: true, jugadorId: true } })
+    const jugadorLocal = jugadores.find((j) => j.equipoId === equipoA.id)!.jugadorId
+    const jugadorVisitante = jugadores.find((j) => j.equipoId === equipoB.id)!.jugadorId
+    for (let i = 0; i < local; i++) await app.inject({ method: 'POST', url: `/api/partidos/${partidoId}/eventos`, payload: { equipoId: equipoA.id, jugadorId: jugadorLocal, tipo: 'GOL', minuto: i + 1 }, headers: conCookie(tokenDelegadoA) })
+    for (let i = 0; i < visitante; i++) await app.inject({ method: 'POST', url: `/api/partidos/${partidoId}/eventos`, payload: { equipoId: equipoB.id, jugadorId: jugadorVisitante, tipo: 'GOL', minuto: i + 1 }, headers: conCookie(tokenDelegadoB) })
+  }
 
   it('crear partido AMISTOSO', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/partidos', payload: { tipo: 'AMISTOSO', equipoLocalId: equipoA.id, equipoVisitanteId: equipoB.id, fechaHora: '2026-06-01T15:00:00Z' }, headers: conCookie(tokenDelegadoA) })
@@ -83,6 +93,7 @@ describe('módulo de partidos (FASE 7)', () => {
   it('transiciones PROGRAMADO → EN_CURSO → FINALIZADO', async () => {
     const c = await app.inject({ method: 'POST', url: '/api/partidos', payload: { tipo: 'AMISTOSO', equipoLocalId: equipoA.id, equipoVisitanteId: equipoB.id, fechaHora: '2026-10-01T15:00:00Z' }, headers: conCookie(tokenDelegadoA) })
     const id = c.json().data.id
+    await cargarGoles(id, 2, 1)
     await app.inject({ method: 'POST', url: `/api/partidos/${id}/resultado`, payload: { golesLocal: 2, golesVisitante: 1 }, headers: conCookie(tokenDelegadoA) })
 
     const ec = await app.inject({ method: 'POST', url: `/api/partidos/${id}/estado`, payload: { estado: 'EN_CURSO' }, headers: conCookie(tokenDelegadoA) })
@@ -97,6 +108,7 @@ describe('módulo de partidos (FASE 7)', () => {
   it('resultado en EN_CURSO finaliza el partido', async () => {
     const c = await app.inject({ method: 'POST', url: '/api/partidos', payload: { tipo: 'AMISTOSO', equipoLocalId: equipoA.id, equipoVisitanteId: equipoB.id, fechaHora: '2026-11-01T15:00:00Z' }, headers: conCookie(tokenDelegadoA) })
     const id = c.json().data.id
+    await cargarGoles(id, 1, 1)
     await app.inject({ method: 'POST', url: `/api/partidos/${id}/estado`, payload: { estado: 'EN_CURSO' }, headers: conCookie(tokenDelegadoA) })
 
     const res = await app.inject({ method: 'POST', url: `/api/partidos/${id}/resultado`, payload: { golesLocal: 1, golesVisitante: 1 }, headers: conCookie(tokenDelegadoA) })
@@ -152,6 +164,10 @@ describe('módulo de partidos (FASE 7)', () => {
   it('publicar + endpoint público', async () => {
     const c = await app.inject({ method: 'POST', url: '/api/partidos', payload: { tipo: 'AMISTOSO', equipoLocalId: equipoA.id, equipoVisitanteId: equipoB.id, fechaHora: '2027-06-01T15:00:00Z' }, headers: conCookie(tokenDelegadoA) })
     const id = c.json().data.id
+    await cargarGoles(id, 0, 0)
+    await app.inject({ method: 'POST', url: `/api/partidos/${id}/resultado`, payload: { golesLocal: 0, golesVisitante: 0 }, headers: conCookie(tokenDelegadoA) })
+    await app.inject({ method: 'POST', url: `/api/partidos/${id}/estado`, payload: { estado: 'EN_CURSO' }, headers: conCookie(tokenDelegadoA) })
+    await app.inject({ method: 'POST', url: `/api/partidos/${id}/resultado`, payload: { golesLocal: 0, golesVisitante: 0 }, headers: conCookie(tokenDelegadoA) })
     const priv = await app.inject({ method: 'GET', url: `/api/publico/partidos/${id}` })
     expect(priv.statusCode).toBe(404)
 

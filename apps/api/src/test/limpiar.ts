@@ -27,6 +27,7 @@ export async function limpiarBase(): Promise<void> {
       prisma.jornada.deleteMany(),
       prisma.convocatoria.deleteMany(),
       prisma.formacion.deleteMany(),
+      prisma.eventoPartido.deleteMany(),
       prisma.partido.deleteMany(),
       prisma.equipo.deleteMany(),
       prisma.usuario.deleteMany(),

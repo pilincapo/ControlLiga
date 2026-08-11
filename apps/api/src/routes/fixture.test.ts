@@ -88,6 +88,15 @@ describe('fixture HTTP (FASE 8)', () => {
       ...headers(token),
     })
 
+  async function cargarGol(partidoId: string, equipoId: string, jugadorId: string): Promise<void> {
+    await app.inject({
+      method: 'POST',
+      url: `/api/partidos/${partidoId}/eventos`,
+      payload: { equipoId, jugadorId, tipo: 'GOL', minuto: 1 },
+      ...headers(tokenAdmin),
+    })
+  }
+
   it('rechaza generación sin permisos y fuera del alcance; autoriza administrador del torneo', async () => {
     expect((await generar(competenciaId, tokenSinPermiso)).statusCode).toBe(403)
     expect((await generar(competenciaId, tokenOtroAlcance)).statusCode).toBe(403)
@@ -228,6 +237,13 @@ describe('fixture HTTP (FASE 8)', () => {
     const partido = await getPrisma().partido.findFirstOrThrow({
       where: { torneoCategoriaId: competencia.id },
     })
+    const persona = await getPrisma().persona.create({ data: { nombre: 'Goleador', apellido: 'Fixture', dni: `39${Date.now().toString().slice(-6)}` } })
+    const jugador = await getPrisma().jugador.create({ data: { personaId: persona.id } })
+    await getPrisma().equipoJugador.create({ data: { equipoId: partido.equipoLocalId!, jugadorId: jugador.id } })
+    await cargarGol(partido.id, partido.equipoLocalId!, jugador.id)
+    await app.inject({ method: 'POST', url: `/api/partidos/${partido.id}/resultado`, payload: { golesLocal: 1, golesVisitante: 0 }, ...headers(tokenAdmin) })
+    await app.inject({ method: 'POST', url: `/api/partidos/${partido.id}/estado`, payload: { estado: 'EN_CURSO' }, ...headers(tokenAdmin) })
+    await app.inject({ method: 'POST', url: `/api/partidos/${partido.id}/resultado`, payload: { golesLocal: 1, golesVisitante: 0 }, ...headers(tokenAdmin) })
     expect(
       (
         await app.inject({

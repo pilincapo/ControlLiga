@@ -10,6 +10,7 @@ import { transicionValida } from '../partidos/estados.js'
 import type { ContextoAuth } from '../auth/contexto.js'
 import type { PrismaClient } from '../generated/prisma/client.js'
 import type { EstadoPartido } from '../generated/prisma/enums.js'
+import { validarGoles } from './eventos-partido.js'
 
 interface CrearPartidoBody {
   tipo: string
@@ -211,10 +212,12 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
     if (!p) throw noEncontrado('Partido')
     if (!(await puedeGestionar(prisma, auth, p))) throw prohibido('No tenés permiso para cambiar el estado')
     if (p.estado === body.estado) throw badRequest('El partido ya está en ese estado')
+    if (p.estado === 'FINALIZADO') throw conflicto('partido_finalizado', 'Un partido finalizado no se puede reabrir')
     if (!transicionValida(p.estado, body.estado as EstadoPartido)) throw conflicto('transicion_invalida', `No se puede pasar de ${p.estado} a ${body.estado}`)
     if (body.estado === 'FINALIZADO' && (p.golesLocal == null || p.golesVisitante == null || p.golesLocal < 0 || p.golesVisitante < 0)) {
       throw badRequest('El resultado (goles) debe estar cargado antes de finalizar')
     }
+    if (body.estado === 'FINALIZADO' && !(await validarGoles(prisma, p.id, p.golesLocal, p.golesVisitante))) throw badRequest('Los goles oficiales no coinciden con eventos GOL no anulados')
     const actualizado = await prisma.partido.update({ where: { id }, data: { estado: body.estado as EstadoPartido }, select: { id: true, estado: true } })
     await auditar(prisma, { entidad: 'Partido', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { cambioDeEstado: { de: p.estado, a: body.estado } } })
     return { data: actualizado }
@@ -234,7 +237,10 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
     if (!(await puedeGestionar(prisma, auth, p))) throw prohibido('No tenés permiso para cargar el resultado')
     const nuevoEstado = p.estado === 'EN_CURSO' ? 'FINALIZADO' : undefined
     const data: Record<string, unknown> = { golesLocal: body.golesLocal, golesVisitante: body.golesVisitante }
-    if (nuevoEstado) data.estado = nuevoEstado
+    if (nuevoEstado) {
+      if (!(await validarGoles(prisma, p.id, body.golesLocal, body.golesVisitante))) throw badRequest('Los goles oficiales no coinciden con eventos GOL no anulados')
+      data.estado = nuevoEstado
+    }
     const actualizado = await prisma.partido.update({ where: { id }, data, select: { id: true, golesLocal: true, golesVisitante: true, estado: true } })
     await auditar(prisma, { entidad: 'Partido', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { resultado: { golesLocal: body.golesLocal, golesVisitante: body.golesVisitante }, ...(nuevoEstado ? { finalizado: true } : {}) } })
     return { data: actualizado }
@@ -263,6 +269,9 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
     const p = await prisma.partido.findUnique({ where: { id }, select: { id: true, tipo: true, torneoId: true, equipoResponsableId: true, equipoLocalId: true } })
     if (!p) throw noEncontrado('Partido')
     if (!(await puedeGestionar(prisma, auth, p))) throw prohibido('No tenés permiso para publicar este partido')
+    const completo = await prisma.partido.findUnique({ where: { id }, select: { estado: true, golesLocal: true, golesVisitante: true } })
+    if (!completo || completo.estado !== 'FINALIZADO') throw badRequest('Solo se pueden publicar partidos finalizados')
+    if (!(await validarGoles(prisma, id, completo.golesLocal, completo.golesVisitante))) throw badRequest('Los goles oficiales no coinciden con eventos GOL no anulados')
     const res = await prisma.partido.update({ where: { id }, data: { publicada: true }, select: { id: true, publicada: true } })
     await auditar(prisma, { entidad: 'Partido', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { publicada: true } })
     return { data: res }

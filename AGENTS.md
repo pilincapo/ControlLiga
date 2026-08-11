@@ -14,3 +14,4 @@
 - **Postgres local**: siempre por Docker (`pnpm db:up`), no instalar en Windows.
 - **Prisma**: generar cliente con `pnpm prisma:generate` después de cambiar `schema.prisma`. El cliente generado no se commitea.
 - **Idioma de código**: identificadores y mensajes en español, estilo Prettier (sin punto y coma, comillas simples).
+- **Git**: cada commit nuevo ejecuta push automático a `origin` mediante `.githooks/post-commit`.
