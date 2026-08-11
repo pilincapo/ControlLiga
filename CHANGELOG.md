@@ -2,6 +2,15 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.10.0] - 2026-08-11
+
+### Agregado
+
+- **FASE 10 — Caja privada de equipo**, documentada en `docs/fase-10-diseno-caja.md`, reutilizando `MovimientoCaja` sin cambios de schema ni migraciones.
+- Permiso compartido `caja:ver`; CRUD controlado, estados, anulación lógica, resumen, deudas, historial de jugador, filtros y auditoría.
+- RBAC estricto por equipo: DELEGADO administra, TECNICO consulta, AUXILIAR sin acceso, JUGADOR solo su historial/deuda, ADMINISTRADOR sin acceso automático y SUPERADMIN operativo/auditable.
+- Sección básica Caja en detalle de equipo.
+
 ## [0.9.0] - 2026-08-11
 
 ### Agregado

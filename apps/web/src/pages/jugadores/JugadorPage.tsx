@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { apiFetch } from '../../utils/api'
 import Layout from '../../components/Layout'
+import { useAuth } from '../../auth/useAuth'
 import type { FichaJugador } from '../equipos/tipos'
 
 export default function JugadorPage() {
   const { id } = useParams<{ id: string }>()
+  const { usuario } = useAuth()
   const [jugador, setJugador] = useState<FichaJugador | null>(null)
+  const [caja, setCaja] = useState<{ resumen: { totalPendiente: number; saldoActual: number }; movimientos: Array<{ id: string; concepto: string; importe: string; estado: string; fecha: string }> } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -23,6 +26,11 @@ export default function JugadorPage() {
       activo = false
     }
   }, [id])
+
+  useEffect(() => {
+    if (!id || usuario?.jugadorId !== id) return
+    apiFetch<typeof caja>(`/jugadores/${id}/caja`).then(setCaja).catch(() => undefined)
+  }, [id, usuario?.jugadorId])
 
   if (!jugador) {
     return (
@@ -54,6 +62,8 @@ export default function JugadorPage() {
         {p.telefono && <p>Teléfono: {p.telefono}</p>}
         {p.email && <p>Email: {p.email}</p>}
       </div>
+
+      {caja && <div className="tarjeta"><h3>Mi caja</h3><p>Deuda pendiente: <strong>{caja.resumen.totalPendiente}</strong> · Saldo cobrado: {caja.resumen.saldoActual}</p><ul className="lista">{caja.movimientos.map((m) => <li key={m.id}>{new Date(m.fecha).toLocaleDateString()} · {m.concepto} · {m.importe} · {m.estado}</li>)}</ul></div>}
 
       <div className="tarjeta">
         <h3>Historial de equipos</h3>
