@@ -9,41 +9,41 @@ export const TEST_URL =
 export async function limpiarBase(): Promise<void> {
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: TEST_URL }) })
   try {
-    await prisma.$transaction([
-      prisma.auditoriaLog.deleteMany(),
-      prisma.passwordResetToken.deleteMany(),
-      prisma.session.deleteMany(),
-      prisma.rolUsuario.deleteMany(),
-      prisma.convocatoriaJugador.deleteMany(),
-      prisma.formacionJugador.deleteMany(),
-      prisma.formacionInstanciaJugador.deleteMany(),
-      prisma.formacionInstancia.deleteMany(),
-      prisma.movimientoCaja.deleteMany(),
-      prisma.sancion.deleteMany(),
-      prisma.notificacion.deleteMany(),
-      prisma.invitacion.deleteMany(),
-      prisma.equipoUsuario.deleteMany(),
-      prisma.equipoJugador.deleteMany(),
-      prisma.jugadorParticipacion.deleteMany(),
-      prisma.equipoParticipacion.deleteMany(),
-      prisma.jornadaEquipoDescanso.deleteMany(),
-      prisma.jornada.deleteMany(),
-      prisma.convocatoria.deleteMany(),
-      prisma.formacion.deleteMany(),
-      prisma.eventoPartido.deleteMany(),
-      prisma.partido.deleteMany(),
-      prisma.equipo.deleteMany(),
-      prisma.usuario.deleteMany(),
-      prisma.jugador.deleteMany(),
-      prisma.persona.deleteMany(),
-      prisma.zona.deleteMany(),
-      prisma.configuracionCompetencia.deleteMany(),
-      prisma.torneoCategoria.deleteMany(),
-      prisma.temporada.deleteMany(),
-      prisma.categoria.deleteMany(),
-      prisma.torneo.deleteMany(),
-      prisma.organizacion.deleteMany(),
-    ])
+    // Prisma's adapter-pg warns when a batch transaction starts concurrent queries.
+    // Cleanup only needs FK order, not atomicity, so run deletes sequentially.
+    await prisma.auditoriaLog.deleteMany()
+    await prisma.passwordResetToken.deleteMany()
+    await prisma.session.deleteMany()
+    await prisma.rolUsuario.deleteMany()
+    await prisma.convocatoriaJugador.deleteMany()
+    await prisma.formacionJugador.deleteMany()
+    await prisma.formacionInstanciaJugador.deleteMany()
+    await prisma.formacionInstancia.deleteMany()
+    await prisma.movimientoCaja.deleteMany()
+    await prisma.sancion.deleteMany()
+    await prisma.notificacion.deleteMany()
+    await prisma.invitacion.deleteMany()
+    await prisma.equipoUsuario.deleteMany()
+    await prisma.equipoJugador.deleteMany()
+    await prisma.jugadorParticipacion.deleteMany()
+    await prisma.equipoParticipacion.deleteMany()
+    await prisma.jornadaEquipoDescanso.deleteMany()
+    await prisma.jornada.deleteMany()
+    await prisma.convocatoria.deleteMany()
+    await prisma.formacion.deleteMany()
+    await prisma.eventoPartido.deleteMany()
+    await prisma.partido.deleteMany()
+    await prisma.equipo.deleteMany()
+    await prisma.usuario.deleteMany()
+    await prisma.jugador.deleteMany()
+    await prisma.persona.deleteMany()
+    await prisma.zona.deleteMany()
+    await prisma.configuracionCompetencia.deleteMany()
+    await prisma.torneoCategoria.deleteMany()
+    await prisma.temporada.deleteMany()
+    await prisma.categoria.deleteMany()
+    await prisma.torneo.deleteMany()
+    await prisma.organizacion.deleteMany()
   } finally {
     await prisma.$disconnect()
   }

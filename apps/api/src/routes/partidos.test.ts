@@ -172,6 +172,8 @@ describe('módulo de partidos (FASE 7)', () => {
     expect(priv.statusCode).toBe(404)
 
     await app.inject({ method: 'POST', url: `/api/partidos/${id}/publicar`, headers: conCookie(tokenDelegadoA) })
+    expect((await app.inject({ method: 'GET', url: `/api/publico/partidos/${id}` })).statusCode).toBe(404)
+    await getPrisma().equipo.updateMany({ where: { id: { in: [equipoA.id, equipoB.id] } }, data: { privado: false } })
     const pub = await app.inject({ method: 'GET', url: `/api/publico/partidos/${id}` })
     expect(pub.statusCode).toBe(200)
   })

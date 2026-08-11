@@ -164,7 +164,7 @@ export async function invitacionesRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/equipos/:id/invitaciones-cuerpo',
     { preHandler: requiereRolEnEquipo('DELEGADO') },
-    async (request) => {
+    async (request, reply) => {
       const auth = getAuth(request)
       const { id } = request.params as { id: string }
       const body = request.body as InvitarCuerpoBody
@@ -180,21 +180,25 @@ export async function invitacionesRoutes(app: FastifyInstance): Promise<void> {
 
       const usuario = await prisma.usuario.findUnique({ where: { email }, select: { id: true } })
       if (!usuario) {
-        return { data: { existe: false } }
+        return reply.status(202).send({ data: { mensaje: 'Si existe una cuenta elegible, recibirá una invitación' } })
       }
       const activo = await prisma.equipoUsuario.findFirst({
         where: { equipoId: id, usuarioId: usuario.id, activo: true },
         select: { id: true },
       })
-      if (activo) throw conflicto('usuario_en_equipo', 'Ese usuario ya integra el cuerpo del equipo')
+      if (activo) {
+        return reply.status(202).send({ data: { mensaje: 'Si existe una cuenta elegible, recibirá una invitación' } })
+      }
       const pendiente = await prisma.invitacion.findFirst({
         where: { equipoId: id, usuarioId: usuario.id, tipo: TipoInvitacion.CUERPO_TECNICO, estado: EstadoInvitacion.PENDIENTE },
         select: { id: true },
       })
-      if (pendiente) throw conflicto('invitacion_pendiente', 'Ya existe una invitación pendiente para ese usuario')
+      if (pendiente) {
+        return reply.status(202).send({ data: { mensaje: 'Si existe una cuenta elegible, recibirá una invitación' } })
+      }
 
       const expiraEn = new Date(Date.now() + ttlInvitacionMs())
-      const invitacion = await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx) => {
         const creada = await tx.invitacion.create({
           data: {
             tipo: TipoInvitacion.CUERPO_TECNICO,
@@ -228,7 +232,7 @@ export async function invitacionesRoutes(app: FastifyInstance): Promise<void> {
         })
         return creada
       })
-      return { data: { existe: true, invitacion } }
+      return reply.status(202).send({ data: { mensaje: 'Si existe una cuenta elegible, recibirá una invitación' } })
     },
   )
 

@@ -228,6 +228,7 @@ describe('fixture HTTP (FASE 8)', () => {
     })
     expect(config.statusCode).toBe(200)
     expect((await generar(competencia.id)).statusCode).toBe(200)
+    await getPrisma().equipo.updateMany({ where: { id: { in: competencia.equipos } }, data: { privado: false } })
     const privado = await app.inject({
       method: 'GET',
       url: `/api/publico/torneo-categorias/${competencia.id}/fixture`,

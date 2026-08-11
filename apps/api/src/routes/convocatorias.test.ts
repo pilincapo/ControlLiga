@@ -262,6 +262,8 @@ describe('módulo de convocatorias (FASE 6)', () => {
     expect(priv.statusCode).toBe(404)
 
     await app.inject({ method: 'POST', url: `/api/convocatorias/${id}/publicar`, headers: conCookie(tokenDelegadoA) })
+    expect((await app.inject({ method: 'GET', url: `/api/publico/convocatorias/${id}` })).statusCode).toBe(404)
+    await getPrisma().equipo.update({ where: { id: equipoA.id }, data: { privado: false } })
     const pub = await app.inject({ method: 'GET', url: `/api/publico/convocatorias/${id}` })
     expect(pub.statusCode).toBe(200)
 

@@ -4,7 +4,7 @@ import { getPrisma } from '../db.js'
 import { badRequest, noEncontrado, prohibido } from '../http.js'
 import { hashPassword } from '../auth/password.js'
 import { autenticar, getAuth } from '../plugins/auth.js'
-import { esSuperadmin } from '../auth/permisos.js'
+import { esSuperadmin, puedeAsignarRoles } from '../auth/permisos.js'
 import { auditar } from '../auth/auditoria.js'
 import { SELECT_USUARIO_PUBLICO } from './helpers.js'
 
@@ -63,32 +63,42 @@ export async function usuariosRoutes(app: FastifyInstance): Promise<void> {
     if (body.password !== undefined && body.password.length < 8) {
       throw badRequest('La contraseña debe tener al menos 8 caracteres')
     }
-    const cambios = await prisma.usuario.update({
-      where: { id },
-      data: {
-        activo: body.activo,
-        email: body.email,
-        nombre: body.nombre,
-        apellido: body.apellido,
-        passwordHash: body.password ? await hashPassword(body.password) : undefined,
-      },
-      select: SELECT_USUARIO_PUBLICO,
-    })
-    await auditar(prisma, {
-      entidad: 'Usuario',
-      entidadId: id,
-      accion: 'UPDATE',
-      usuarioId: auth.usuarioId,
-      cambios: { campos: Object.keys(body) },
+    const passwordHash = body.password ? await hashPassword(body.password) : undefined
+    const revocarAcceso = body.activo === false || passwordHash !== undefined
+    const cambios = await prisma.$transaction(async (tx) => {
+      const actualizado = await tx.usuario.update({
+        where: { id },
+        data: {
+          activo: body.activo,
+          email: body.email,
+          nombre: body.nombre,
+          apellido: body.apellido,
+          passwordHash,
+        },
+        select: SELECT_USUARIO_PUBLICO,
+      })
+      if (revocarAcceso) {
+        const ahora = new Date()
+        await tx.session.updateMany({ where: { usuarioId: id, revokedAt: null }, data: { revokedAt: ahora } })
+        await tx.passwordResetToken.updateMany({
+          where: { usuarioId: id, usedAt: null, revokedAt: null },
+          data: { revokedAt: ahora },
+        })
+      }
+      await auditar(tx, {
+        entidad: 'Usuario',
+        entidadId: id,
+        accion: 'UPDATE',
+        usuarioId: auth.usuarioId,
+        cambios: { campos: Object.keys(body), accesoRevocado: revocarAcceso },
+      })
+      return actualizado
     })
     return { data: cambios }
   })
 
   app.post('/usuarios/:id/roles', { preHandler: autenticar }, async (request) => {
     const auth = getAuth(request)
-    if (!esSuperadmin(auth) && !auth.roles.some((r) => r.codigo === 'ADMINISTRADOR')) {
-      throw prohibido('No tenés permiso para modificar roles')
-    }
     const { id } = request.params as { id: string }
     const body = request.body as AsignarRolesBody
     if (!Array.isArray(body.roles)) {
@@ -103,14 +113,21 @@ export async function usuariosRoutes(app: FastifyInstance): Promise<void> {
     if (!existente) {
       throw noEncontrado('Usuario')
     }
-    const tieneSuperadmin = existente.roles.some((r) => r.activo && r.rol.codigo === 'SUPERADMIN')
-    const actorSuperadmin = esSuperadmin(auth)
-    if (tieneSuperadmin && !actorSuperadmin) {
-      throw prohibido('No podés modificar los roles de un SUPERADMIN')
-    }
-    if (!actorSuperadmin && body.roles.some((r) => r.codigo === 'SUPERADMIN')) {
-      throw prohibido('Solo el SUPERADMIN puede asignar ese rol')
-    }
+    await puedeAsignarRoles(
+      prisma,
+      auth,
+      id,
+      existente.roles
+        .filter((rol) => rol.activo)
+        .map((rol) => ({
+          codigo: rol.rol.codigo,
+          organizacionId: rol.organizacionId,
+          torneoId: rol.torneoId,
+          equipoId: rol.equipoId,
+          jugadorId: rol.jugadorId,
+        })),
+      body.roles,
+    )
 
     const rolesExistentes = await prisma.rol.findMany({
       where: { codigo: { in: body.roles.map((r) => r.codigo) } },

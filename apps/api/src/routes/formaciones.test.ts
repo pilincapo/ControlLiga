@@ -485,6 +485,9 @@ describe('módulo de formaciones (FASE 5)', () => {
 
     await app.inject({ method: 'POST', url: `/api/formaciones/${id}/publicar`, headers: conCookie(tokenDelegadoA) })
 
+    expect((await app.inject({ method: 'GET', url: `/api/publico/formaciones/${id}` })).statusCode).toBe(404)
+    await getPrisma().equipo.update({ where: { id: equipoA.id }, data: { privado: false } })
+
     const publica = await app.inject({ method: 'GET', url: `/api/publico/formaciones/${id}` })
     expect(publica.statusCode).toBe(200)
     expect(publica.json().data.jugadores.length).toBe(1)

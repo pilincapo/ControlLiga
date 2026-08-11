@@ -2,6 +2,27 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.14.0] - 2026-08-11
+
+### Seguridad
+
+- **FASE 14 - Hardening multi-tenant y preparación para beta**, diseñada en `docs/fase-14-diseno-hardening-beta.md`.
+- Política centralizada para asignación de roles: impide auto-escalamiento, scopes inválidos y cambios administrativos fuera de organización; audita cambios.
+- Sesiones de usuarios desactivados quedan invalidadas; desactivación o cambio administrativo de contraseña revoca sesiones y tokens de reset pendientes.
+- Rate limit de login por IP e identidad hasheada; limitador de memoria acotado para beta de una instancia.
+- Estadísticas, sanciones y caja validan ámbito de equipo/torneo; historial de caja de jugador filtra equipos autorizados.
+- Endpoints públicos bloquean partidos, formaciones, convocatorias, fixture, tabla y estadísticas vinculados a equipos privados.
+- Invitación de cuerpo técnico responde de forma uniforme para evitar enumeración de cuentas.
+
+### Operación
+
+- Producción valida environment crítico, HTTPS, cookies seguras, CORS exacto, URL de reset y token de health DB; `TRUST_PROXY` es explícito.
+- Scripts `scripts/backup-postgres.ps1` y `scripts/restore-postgres.ps1`; checklist en `docs/beta-readiness.md`.
+
+### Tests
+
+- Suite FASE 14 para sesión desactivada, rate limit login y accesos IDOR de estadísticas/caja; regresiones públicas y RBAC ampliadas.
+
 ## [0.13.0] - 2026-08-11
 
 ### Agregado

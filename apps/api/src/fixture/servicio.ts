@@ -47,7 +47,7 @@ export async function cargarCompetencia(db: Db, torneoCategoriaId: string, zonaI
 }
 
 export async function equiposConfirmados(db: Db, torneoCategoriaId: string, zonaId: string | null) {
-  return db.equipoParticipacion.findMany({ where: { torneoCategoriaId, zonaId, estado: 'CONFIRMADO' }, select: { equipoId: true, equipo: { select: { id: true, nombre: true, escudoUrl: true } } }, orderBy: { equipoId: 'asc' } })
+  return db.equipoParticipacion.findMany({ where: { torneoCategoriaId, zonaId, estado: 'CONFIRMADO' }, select: { equipoId: true, equipo: { select: { id: true, nombre: true, escudoUrl: true, privado: true } } }, orderBy: { equipoId: 'asc' } })
 }
 
 export function validarCantidad(equipos: unknown[]) {

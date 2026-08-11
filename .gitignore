@@ -23,6 +23,10 @@ apps/api/src/generated/
 *.log
 npm-debug.log*
 
+# Backups PostgreSQL operativos
+*.dump
+*.backup
+
 # Sistema
 .DS_Store
 Thumbs.db

@@ -3,7 +3,7 @@ import { PERMISOS } from '@controlliga/shared'
 import { getPrisma } from '../db.js'
 import { auditar } from '../auth/auditoria.js'
 import { autenticar, getAuth, requierePermiso } from '../plugins/auth.js'
-import { esAdminDeTorneo, esMiembroEquipo, esSuperadmin, puedeEnEquipo } from '../auth/permisos.js'
+import { esAdminDeTorneo, esDelegadoDelJugador, esMiembroEquipo, esSuperadmin, puedeEnEquipo, puedeVerEquipo, puedeVerTorneo } from '../auth/permisos.js'
 import { badRequest, noEncontrado, prohibido } from '../http.js'
 import { EstadoEquipoJugador, EstadoPartido, TipoEventoPartido } from '../generated/prisma/enums.js'
 
@@ -33,14 +33,23 @@ function esAdministrador(auth: ReturnType<typeof getAuth>): boolean {
 
 async function puedeVerPartido(prisma: ReturnType<typeof getPrisma>, auth: ReturnType<typeof getAuth>, partidoId: string): Promise<boolean> {
   if (esAdministrador(auth)) return true
-  const partido = await prisma.partido.findUnique({ where: { id: partidoId }, select: { publicada: true, equipoLocalId: true, equipoVisitanteId: true } })
+  const partido = await prisma.partido.findUnique({ where: { id: partidoId }, select: { publicada: true, equipoLocalId: true, equipoVisitanteId: true, equipoLocal: { select: { privado: true } }, equipoVisitante: { select: { privado: true } } } })
   if (!partido) return false
-  if (partido.publicada) return true
+  if (partido.publicada && !partido.equipoLocal?.privado && !partido.equipoVisitante?.privado) return true
   for (const equipoId of [partido.equipoLocalId, partido.equipoVisitanteId]) {
     if (equipoId && await esMiembroEquipo(prisma, auth, equipoId)) return true
     if (equipoId && auth.jugadorId && await prisma.equipoJugador.findFirst({ where: { equipoId, jugadorId: auth.jugadorId, estado: { not: EstadoEquipoJugador.BAJA } }, select: { id: true } })) return true
   }
   return false
+}
+
+async function puedeVerEstadisticasJugador(prisma: ReturnType<typeof getPrisma>, auth: ReturnType<typeof getAuth>, jugadorId: string): Promise<boolean> {
+  return esSuperadmin(auth) || auth.jugadorId === jugadorId || (await esDelegadoDelJugador(prisma, auth, jugadorId))
+}
+
+async function puedeVerCompetencia(prisma: ReturnType<typeof getPrisma>, auth: ReturnType<typeof getAuth>, torneoCategoriaId: string): Promise<boolean> {
+  const competencia = await prisma.torneoCategoria.findUnique({ where: { id: torneoCategoriaId }, select: { torneoId: true } })
+  return competencia !== null && puedeVerTorneo(prisma, auth, competencia.torneoId)
 }
 
 async function cargarContexto(prisma: ReturnType<typeof getPrisma>, id: string) {
@@ -140,22 +149,28 @@ export async function eventosPartidoRoutes(app: FastifyInstance): Promise<void> 
   })
 
   app.get('/partidos/:id/estadisticas', { preHandler: requierePermiso(PERMISOS.estadisticasVer) }, async (request) => { const id = (request.params as { id: string }).id; if (!(await puedeVerPartido(getPrisma(), getAuth(request), id))) throw prohibido('No tenés acceso a estas estadísticas'); return { data: await estadisticasPartido(getPrisma(), id) } })
-  app.get('/jugadores/:id/estadisticas', { preHandler: requierePermiso(PERMISOS.estadisticasVer) }, async (request) => { const jugadorId = (request.params as { id: string }).id; const filas = await getPrisma().eventoPartido.findMany({ where: { jugadorId, anulado: false }, select: { partidoId: true, tipo: true, subtipo: true } }); return { data: { jugadorId, goles: filas.filter((e) => e.tipo === 'GOL').length, asistencias: await getPrisma().eventoPartido.count({ where: { jugadorRelacionadoId: jugadorId, tipo: 'ASISTENCIA', anulado: false } }), amarillas: filas.filter((e) => e.tipo === 'TARJETA' && e.subtipo === 'AMARILLA').length, rojas: filas.filter((e) => e.tipo === 'TARJETA' && e.subtipo === 'ROJA').length } } })
-  app.get('/equipos/:id/estadisticas', { preHandler: requierePermiso(PERMISOS.estadisticasVer) }, async (request) => { const equipoId = (request.params as { id: string }).id; const eventos = await getPrisma().eventoPartido.findMany({ where: { equipoId, anulado: false }, include: { partido: { select: { estado: true } } } }); return { data: { equipoId, goles: eventos.filter((e) => e.tipo === 'GOL').length, asistencias: eventos.filter((e) => e.tipo === 'ASISTENCIA').length, amarillas: eventos.filter((e) => e.tipo === 'TARJETA' && e.subtipo === 'AMARILLA').length, rojas: eventos.filter((e) => e.tipo === 'TARJETA' && e.subtipo === 'ROJA').length } } })
+  app.get('/jugadores/:id/estadisticas', { preHandler: requierePermiso(PERMISOS.estadisticasVer) }, async (request) => { const auth = getAuth(request); const jugadorId = (request.params as { id: string }).id; const prisma = getPrisma(); if (!(await puedeVerEstadisticasJugador(prisma, auth, jugadorId))) throw prohibido('No tenés acceso a estas estadísticas'); const filas = await prisma.eventoPartido.findMany({ where: { jugadorId, anulado: false }, select: { partidoId: true, tipo: true, subtipo: true } }); return { data: { jugadorId, goles: filas.filter((e) => e.tipo === 'GOL').length, asistencias: await prisma.eventoPartido.count({ where: { jugadorRelacionadoId: jugadorId, tipo: 'ASISTENCIA', anulado: false } }), amarillas: filas.filter((e) => e.tipo === 'TARJETA' && e.subtipo === 'AMARILLA').length, rojas: filas.filter((e) => e.tipo === 'TARJETA' && e.subtipo === 'ROJA').length } } })
+  app.get('/equipos/:id/estadisticas', { preHandler: requierePermiso(PERMISOS.estadisticasVer) }, async (request) => { const auth = getAuth(request); const equipoId = (request.params as { id: string }).id; const prisma = getPrisma(); if (!(await puedeVerEquipo(prisma, auth, equipoId))) throw prohibido('No tenés acceso a estas estadísticas'); const eventos = await prisma.eventoPartido.findMany({ where: { equipoId, anulado: false }, include: { partido: { select: { estado: true } } } }); return { data: { equipoId, goles: eventos.filter((e) => e.tipo === 'GOL').length, asistencias: eventos.filter((e) => e.tipo === 'ASISTENCIA').length, amarillas: eventos.filter((e) => e.tipo === 'TARJETA' && e.subtipo === 'AMARILLA').length, rojas: eventos.filter((e) => e.tipo === 'TARJETA' && e.subtipo === 'ROJA').length } } })
   app.get('/torneo-categorias/:id/estadisticas', { preHandler: autenticar }, async (request) => {
     const torneoCategoriaId = (request.params as { id: string }).id
-    const eventos = await getPrisma().eventoPartido.findMany({ where: { partido: { torneoCategoriaId, estado: 'FINALIZADO', tipo: 'OFICIAL' }, anulado: false } })
+    const prisma = getPrisma()
+    if (!(await puedeVerCompetencia(prisma, getAuth(request), torneoCategoriaId))) throw prohibido('No tenés acceso a estas estadísticas')
+    const eventos = await prisma.eventoPartido.findMany({ where: { partido: { torneoCategoriaId, estado: 'FINALIZADO', tipo: 'OFICIAL' }, anulado: false } })
     return { data: { torneoCategoriaId, goles: eventos.filter((e) => e.tipo === 'GOL').length, asistencias: eventos.filter((e) => e.tipo === 'ASISTENCIA').length, tarjetas: eventos.filter((e) => e.tipo === 'TARJETA').length } }
   })
   app.get('/torneo-categorias/:id/goleadores', { preHandler: autenticar }, async (request) => {
     const torneoCategoriaId = (request.params as { id: string }).id
-    const eventos = await getPrisma().eventoPartido.findMany({ where: { partido: { torneoCategoriaId, estado: 'FINALIZADO', tipo: 'OFICIAL' }, tipo: 'GOL', anulado: false }, select: { jugadorId: true } })
+    const prisma = getPrisma()
+    if (!(await puedeVerCompetencia(prisma, getAuth(request), torneoCategoriaId))) throw prohibido('No tenés acceso a estos goleadores')
+    const eventos = await prisma.eventoPartido.findMany({ where: { partido: { torneoCategoriaId, estado: 'FINALIZADO', tipo: 'OFICIAL' }, tipo: 'GOL', anulado: false }, select: { jugadorId: true } })
     const conteo = new Map<string, number>(); eventos.forEach((e) => { if (e.jugadorId) conteo.set(e.jugadorId, (conteo.get(e.jugadorId) ?? 0) + 1) })
     return { data: [...conteo].map(([jugadorId, goles]) => ({ jugadorId, goles })).sort((a, b) => b.goles - a.goles) }
   })
   app.get('/torneo-categorias/:id/tarjetas', { preHandler: autenticar }, async (request) => {
     const torneoCategoriaId = (request.params as { id: string }).id
-    const eventos = await getPrisma().eventoPartido.findMany({ where: { partido: { torneoCategoriaId, estado: 'FINALIZADO', tipo: 'OFICIAL' }, tipo: 'TARJETA', anulado: false }, select: { jugadorId: true, subtipo: true } })
+    const prisma = getPrisma()
+    if (!(await puedeVerCompetencia(prisma, getAuth(request), torneoCategoriaId))) throw prohibido('No tenés acceso a estas tarjetas')
+    const eventos = await prisma.eventoPartido.findMany({ where: { partido: { torneoCategoriaId, estado: 'FINALIZADO', tipo: 'OFICIAL' }, tipo: 'TARJETA', anulado: false }, select: { jugadorId: true, subtipo: true } })
     const conteo = new Map<string, { amarillas: number; rojas: number }>(); eventos.forEach((e) => { if (!e.jugadorId) return; const v = conteo.get(e.jugadorId) ?? { amarillas: 0, rojas: 0 }; if (e.subtipo === 'AMARILLA') v.amarillas++; if (e.subtipo === 'ROJA') v.rojas++; conteo.set(e.jugadorId, v) })
     return { data: [...conteo].map(([jugadorId, v]) => ({ jugadorId, ...v })) }
   })
@@ -164,7 +179,7 @@ export async function eventosPartidoRoutes(app: FastifyInstance): Promise<void> 
     const tc = await getPrisma().torneoCategoria.findUnique({ where: { id }, select: { torneo: { select: { visiblePublico: true, configuracionPublica: true } } } })
     const config = tc?.torneo.configuracionPublica as { mostrarGoleadores?: boolean } | null
     if (!tc?.torneo.visiblePublico || config?.mostrarGoleadores !== true) throw noEncontrado('Goleadores')
-    const eventos = await getPrisma().eventoPartido.findMany({ where: { partido: { torneoCategoriaId: id, estado: 'FINALIZADO', tipo: 'OFICIAL', publicada: true }, tipo: 'GOL', anulado: false }, select: { jugadorId: true } })
+    const eventos = await getPrisma().eventoPartido.findMany({ where: { partido: { torneoCategoriaId: id, estado: 'FINALIZADO', tipo: 'OFICIAL', publicada: true, equipoLocal: { privado: false }, equipoVisitante: { privado: false } }, tipo: 'GOL', anulado: false }, select: { jugadorId: true } })
     const conteo = new Map<string, number>(); eventos.forEach((e) => { if (e.jugadorId) conteo.set(e.jugadorId, (conteo.get(e.jugadorId) ?? 0) + 1) })
     return { data: [...conteo].map(([jugadorId, goles]) => ({ jugadorId, goles })).sort((a, b) => b.goles - a.goles) }
   })
@@ -173,11 +188,11 @@ export async function eventosPartidoRoutes(app: FastifyInstance): Promise<void> 
     const tc = await getPrisma().torneoCategoria.findUnique({ where: { id }, select: { torneo: { select: { visiblePublico: true, configuracionPublica: true } } } })
     const config = tc?.torneo.configuracionPublica as { mostrarTarjetas?: boolean } | null
     if (!tc?.torneo.visiblePublico || config?.mostrarTarjetas !== true) throw noEncontrado('Tarjetas')
-    const eventos = await getPrisma().eventoPartido.findMany({ where: { partido: { torneoCategoriaId: id, estado: 'FINALIZADO', tipo: 'OFICIAL', publicada: true }, tipo: 'TARJETA', anulado: false }, select: { jugadorId: true, subtipo: true } })
+    const eventos = await getPrisma().eventoPartido.findMany({ where: { partido: { torneoCategoriaId: id, estado: 'FINALIZADO', tipo: 'OFICIAL', publicada: true, equipoLocal: { privado: false }, equipoVisitante: { privado: false } }, tipo: 'TARJETA', anulado: false }, select: { jugadorId: true, subtipo: true } })
     const conteo = new Map<string, { amarillas: number; rojas: number }>(); eventos.forEach((e) => { if (!e.jugadorId) return; const v = conteo.get(e.jugadorId) ?? { amarillas: 0, rojas: 0 }; if (e.subtipo === 'AMARILLA') v.amarillas++; if (e.subtipo === 'ROJA') v.rojas++; conteo.set(e.jugadorId, v) })
     return { data: [...conteo].map(([jugadorId, v]) => ({ jugadorId, ...v })) }
   })
-  app.get('/partidos/:id/sanciones', { preHandler: requierePermiso(PERMISOS.estadisticasVer) }, async (request) => ({ data: await getPrisma().sancion.findMany({ where: { partidoId: (request.params as { id: string }).id }, orderBy: { createdAt: 'asc' } }) }))
+  app.get('/partidos/:id/sanciones', { preHandler: requierePermiso(PERMISOS.estadisticasVer) }, async (request) => { const id = (request.params as { id: string }).id; const prisma = getPrisma(); if (!(await puedeVerPartido(prisma, getAuth(request), id))) throw prohibido('No tenés acceso a estas sanciones'); return { data: await prisma.sancion.findMany({ where: { partidoId: id }, orderBy: { createdAt: 'asc' } }) } })
   app.post('/sanciones', { preHandler: requierePermiso(PERMISOS.sancionesGestionar) }, async (request) => {
     const auth = getAuth(request); const body = request.body as { equipoId: string; jugadorId?: string; partidoId?: string; torneoId?: string; origen: string; tipo: string; motivo: string; fechaInicio: string; fechaFin?: string }
     if (!body.equipoId || !body.origen || !body.tipo || !body.motivo || !body.fechaInicio) throw badRequest('Datos de sanción incompletos')

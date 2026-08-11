@@ -29,7 +29,7 @@ import { cajaRoutes } from './routes/caja.js'
 import { publicoRoutes } from './routes/publico.js'
 
 export function buildApp() {
-  const app = Fastify({ logger: true })
+  const app = Fastify({ logger: true, trustProxy: env.TRUST_PROXY })
 
   const origins = env.CORS_ORIGIN.split(',')
     .map((o) => o.trim())

@@ -2,7 +2,7 @@
 
 Sistema de gestión de ligas de fútbol: torneos, equipos, jugadores, partidos, fixture, estadísticas y pagos.
 
-> **Estado actual**: aplicación funcional hasta FASE 11, con administración autenticada y portal público de contenido publicado.
+> **Estado actual**: aplicación funcional hasta FASE 14, con hardening multi-tenant y preparación para beta controlada. Ver `docs/beta-readiness.md` antes de desplegar.
 
 ## Stack
 
@@ -80,6 +80,15 @@ Pasos: copiar `.env.example` a `.env` en cada carpeta y ajustar valores locales.
 3. Health del backend: http://localhost:3000/api/health
 4. Portal público: http://localhost:5173/publico/torneos
 5. Check de base de datos: http://localhost:3000/api/health/db (responde `{"data":{"database":"connected"}}` si Prisma conecta).
+
+## Beta y producción
+
+- Producción exige HTTPS, `COOKIE_SECURE=true`, `CORS_ORIGIN` HTTPS exacto y `PASSWORD_RESET_URL_BASE` HTTPS.
+- Configurar `TRUST_PROXY` solo con IP/CIDR del proxy confiable o cantidad conocida de hops. Nunca usar confianza global.
+- `GET /api/health/db` requiere header `x-health-token` con `HEALTH_DB_TOKEN` en producción.
+- Rate limiting actual vive en memoria y sirve para una instancia beta. Migrar a almacenamiento compartido antes de escalar horizontalmente.
+- Email de recuperación usa adapter de desarrollo. Configurar y probar proveedor real antes de beta externa.
+- Backup/restore, checklist y bloqueantes: `docs/beta-readiness.md`.
 
 ## Notas de versión
 

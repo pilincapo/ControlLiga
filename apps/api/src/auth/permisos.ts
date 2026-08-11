@@ -3,6 +3,7 @@ import type { RolEnEquipo } from '@controlliga/shared'
 import type { ContextoAuth } from './contexto.js'
 import type { PrismaClient } from '../generated/prisma/client.js'
 import { EstadoEquipoJugador } from '../generated/prisma/enums.js'
+import { prohibido } from '../http.js'
 
 export const ESTADOS_EQUIPOJUGADOR_CONFIRMADOS: EstadoEquipoJugador[] = [
   EstadoEquipoJugador.ACTIVO,
@@ -120,6 +121,29 @@ export async function esMiembroEquipo(
   return membresia !== null
 }
 
+export async function puedeVerEquipo(
+  prisma: PrismaClient,
+  contexto: ContextoAuth,
+  equipoId: string,
+): Promise<boolean> {
+  if (esSuperadmin(contexto) || (await esMiembroEquipo(prisma, contexto, equipoId))) {
+    return true
+  }
+  if (!contexto.jugadorId) {
+    return false
+  }
+  return (
+    (await prisma.equipoJugador.findFirst({
+      where: {
+        equipoId,
+        jugadorId: contexto.jugadorId,
+        estado: { in: ESTADOS_EQUIPOJUGADOR_CONFIRMADOS },
+      },
+      select: { id: true },
+    })) !== null
+  )
+}
+
 export async function puedeEnEquipo(
   prisma: PrismaClient,
   contexto: ContextoAuth,
@@ -168,4 +192,79 @@ export async function esDelegadoDelJugador(
     },
   })
   return count > 0
+}
+
+type AsignacionRol = {
+  codigo: 'SUPERADMIN' | 'ADMINISTRADOR' | 'DELEGADO_TECNICO' | 'JUGADOR'
+  organizacionId?: string | null
+  torneoId?: string | null
+  equipoId?: string | null
+  jugadorId?: string | null
+}
+
+async function organizacionDeScope(prisma: PrismaClient, rol: AsignacionRol): Promise<string | null> {
+  if (rol.organizacionId) {
+    return rol.organizacionId
+  }
+  if (rol.torneoId) {
+    const torneo = await prisma.torneo.findUnique({
+      where: { id: rol.torneoId },
+      select: { organizacionId: true },
+    })
+    return torneo?.organizacionId ?? null
+  }
+  return null
+}
+
+function tieneScopeInvalido(rol: AsignacionRol): boolean {
+  const scopes = [rol.organizacionId, rol.torneoId, rol.equipoId, rol.jugadorId].filter(Boolean)
+  if (rol.codigo === 'SUPERADMIN') {
+    return scopes.length > 0
+  }
+  if (rol.codigo === 'ADMINISTRADOR') {
+    return scopes.length !== 1 || Boolean(rol.equipoId || rol.jugadorId)
+  }
+  if (rol.codigo === 'JUGADOR') {
+    return scopes.length > 0
+  }
+  return scopes.length > 0
+}
+
+export async function puedeAsignarRoles(
+  prisma: PrismaClient,
+  actor: ContextoAuth,
+  usuarioObjetivoId: string,
+  rolesActuales: AsignacionRol[],
+  rolesObjetivo: AsignacionRol[],
+): Promise<void> {
+  if (actor.usuarioId === usuarioObjetivoId) {
+    throw prohibido('No podés modificar tus propios roles')
+  }
+  if (rolesObjetivo.some(tieneScopeInvalido)) {
+    throw prohibido('El alcance del rol no es válido')
+  }
+  if (esSuperadmin(actor)) {
+    return
+  }
+  const organizacionesActor = new Set(
+    actor.roles
+      .filter((rol) => rol.codigo === 'ADMINISTRADOR' && rol.organizacionId)
+      .map((rol) => rol.organizacionId!),
+  )
+  if (organizacionesActor.size === 0) {
+    throw prohibido('No tenés permiso para administrar roles')
+  }
+  const roles = [...rolesActuales, ...rolesObjetivo]
+  for (const rol of roles) {
+    if (rol.codigo === 'SUPERADMIN' || rol.codigo === 'DELEGADO_TECNICO') {
+      throw prohibido('No tenés permiso para administrar ese rol')
+    }
+    if (rol.codigo === 'JUGADOR') {
+      continue
+    }
+    const organizacionId = await organizacionDeScope(prisma, rol)
+    if (!organizacionId || !organizacionesActor.has(organizacionId)) {
+      throw prohibido('No podés administrar roles fuera de tu organización')
+    }
+  }
 }

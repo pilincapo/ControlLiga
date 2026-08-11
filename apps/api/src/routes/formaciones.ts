@@ -537,7 +537,7 @@ export async function formacionesRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/publico/formaciones', async () => {
     const formaciones = await getPrisma().formacion.findMany({
-      where: { publicada: true, OR: [{ partidoId: null }, { partido: { publicada: true, equipoLocal: { privado: false }, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] } }] },
+      where: { publicada: true, equipo: { privado: false }, OR: [{ partidoId: null }, { partido: { publicada: true, equipoLocal: { privado: false }, equipoVisitante: { privado: false }, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] } }] },
       select: {
         id: true,
         nombre: true,
@@ -555,7 +555,7 @@ export async function formacionesRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string }
     const prisma = getPrisma()
     const formacion = await prisma.formacion.findUnique({
-      where: { id, publicada: true, OR: [{ partidoId: null }, { partido: { publicada: true, equipoLocal: { privado: false }, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] } }] },
+      where: { id, publicada: true, equipo: { privado: false }, OR: [{ partidoId: null }, { partido: { publicada: true, equipoLocal: { privado: false }, equipoVisitante: { privado: false }, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] } }] },
       select: {
         id: true,
         nombre: true,

@@ -182,11 +182,17 @@ export async function cajaRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/jugadores/:id/caja', { preHandler: autenticar }, async (request) => {
     const auth = getAuth(request); const jugadorId = (request.params as { id: string }).id
+    const prisma = getPrisma()
+    let equipoIdsAutorizados: string[] | undefined
     if (auth.jugadorId !== jugadorId && !esSuperadmin(auth)) {
-      const equipos = await getPrisma().equipoJugador.findMany({ where: { jugadorId }, select: { equipoId: true } })
-      if (!(await Promise.all(equipos.map((e) => puedeVerCaja(e.equipoId, auth)))).some(Boolean)) throw prohibido('No tenés acceso a la caja de ese jugador')
+      const equipos = await prisma.equipoJugador.findMany({ where: { jugadorId }, select: { equipoId: true } })
+      equipoIdsAutorizados = []
+      for (const equipo of equipos) {
+        if (await puedeVerCaja(equipo.equipoId, auth)) equipoIdsAutorizados.push(equipo.equipoId)
+      }
+      if (equipoIdsAutorizados.length === 0) throw prohibido('No tenés acceso a la caja de ese jugador')
     }
-    const movimientos = await getPrisma().movimientoCaja.findMany({ where: { jugadorId, ...(() => { const q = request.query as Filtros; validarFiltros(q); return { ...(q.desde || q.hasta ? { fecha: { ...(q.desde ? { gte: new Date(q.desde) } : {}), ...(q.hasta ? { lte: new Date(q.hasta) } : {}) } } : {}), ...(q.tipo ? { tipo: q.tipo as never } : {}), ...(q.categoria ? { categoria: q.categoria as never } : {}), ...(q.estado ? { estado: q.estado as never } : {}), } })() }, orderBy: { fecha: 'desc' }, select: camposMovimiento })
+    const movimientos = await prisma.movimientoCaja.findMany({ where: { jugadorId, ...(equipoIdsAutorizados ? { equipoId: { in: equipoIdsAutorizados } } : {}), ...(() => { const q = request.query as Filtros; validarFiltros(q); return { ...(q.desde || q.hasta ? { fecha: { ...(q.desde ? { gte: new Date(q.desde) } : {}), ...(q.hasta ? { lte: new Date(q.hasta) } : {}) } } : {}), ...(q.tipo ? { tipo: q.tipo as never } : {}), ...(q.categoria ? { categoria: q.categoria as never } : {}), ...(q.estado ? { estado: q.estado as never } : {}), } })() }, orderBy: { fecha: 'desc' }, select: camposMovimiento })
     return { data: { jugadorId, resumen: resumen(movimientos), movimientos } }
   })
 }

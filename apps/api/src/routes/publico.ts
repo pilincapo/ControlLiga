@@ -137,7 +137,7 @@ export async function publicoRoutes(app: FastifyInstance): Promise<void> {
     const tc = await competenciaPublica(id)
     const c = config<ConfigPublica>(tc.torneo.configuracionPublica)
     if (c.mostrarEstadisticas !== true) throw noEncontrado('Estadísticas')
-    const eventos = await getPrisma().eventoPartido.findMany({ where: { partido: { torneoCategoriaId: id, tipo: 'OFICIAL', estado: 'FINALIZADO', publicada: true }, anulado: false }, select: { tipo: true } })
+    const eventos = await getPrisma().eventoPartido.findMany({ where: { partido: { torneoCategoriaId: id, tipo: 'OFICIAL', estado: 'FINALIZADO', publicada: true, equipoLocal: { privado: false }, equipoVisitante: { privado: false } }, anulado: false }, select: { tipo: true } })
     return { data: { torneoCategoriaId: id, goles: eventos.filter((e) => e.tipo === 'GOL').length, asistencias: eventos.filter((e) => e.tipo === 'ASISTENCIA').length, tarjetas: eventos.filter((e) => e.tipo === 'TARJETA').length } }
   })
 
@@ -155,7 +155,7 @@ export async function publicoRoutes(app: FastifyInstance): Promise<void> {
     const c = config<ConfigPublica>(tc.torneo.configuracionPublica)
     if (c.mostrarFixture !== true) throw noEncontrado('Fixture')
     const prisma = getPrisma()
-    const partidos = await prisma.partido.findMany({ where: { torneoCategoriaId: id, zonaId: query.zonaId ?? null, jornadaId: { not: null }, publicada: true }, select: { id: true, fechaHora: true, estado: true, golesLocal: true, golesVisitante: true, equipoLocal: { select: { id: true, nombre: true, escudoUrl: true } }, equipoVisitante: { select: { id: true, nombre: true, escudoUrl: true } }, jornadaId: true }, orderBy: { fechaHora: 'asc' } })
+    const partidos = await prisma.partido.findMany({ where: { torneoCategoriaId: id, zonaId: query.zonaId ?? null, jornadaId: { not: null }, publicada: true, equipoLocal: { privado: false }, equipoVisitante: { privado: false } }, select: { id: true, fechaHora: true, estado: true, golesLocal: true, golesVisitante: true, equipoLocal: { select: { id: true, nombre: true, escudoUrl: true } }, equipoVisitante: { select: { id: true, nombre: true, escudoUrl: true } }, jornadaId: true }, orderBy: { fechaHora: 'asc' } })
     const jornadas = await prisma.jornada.findMany({ where: { torneoCategoriaId: id, zonaId: query.zonaId ?? null }, select: { id: true, numero: true, nombre: true, fechaInicio: true }, orderBy: { numero: 'asc' } })
     return { data: { jornadas: jornadas.map((j) => ({ ...j, partidos: partidos.filter((p) => p.jornadaId === j.id) })), publicada: true } }
   })
@@ -167,8 +167,8 @@ export async function publicoRoutes(app: FastifyInstance): Promise<void> {
     const c = config<ConfigPublica>(tc.torneo.configuracionPublica)
     if (c.mostrarTabla !== true) throw noEncontrado('Tabla')
     const equipos = await equiposConfirmados(getPrisma(), id, query.zonaId ?? null)
-    const partidos = await getPrisma().partido.findMany({ where: { torneoCategoriaId: id, zonaId: query.zonaId ?? null, tipo: 'OFICIAL', estado: 'FINALIZADO', publicada: true }, select: { equipoLocalId: true, equipoVisitanteId: true, golesLocal: true, golesVisitante: true } })
-    return { data: calcularTabla(equipos.map((e) => e.equipo), partidos, leerReglas(tc.configuracion ?? { sistemaPuntos: null, desempates: null })) }
+    const partidos = await getPrisma().partido.findMany({ where: { torneoCategoriaId: id, zonaId: query.zonaId ?? null, tipo: 'OFICIAL', estado: 'FINALIZADO', publicada: true, equipoLocal: { privado: false }, equipoVisitante: { privado: false } }, select: { equipoLocalId: true, equipoVisitanteId: true, golesLocal: true, golesVisitante: true } })
+    return { data: calcularTabla(equipos.filter((e) => !e.equipo.privado).map((e) => e.equipo), partidos, leerReglas(tc.configuracion ?? { sistemaPuntos: null, desempates: null })) }
   })
 
   app.get('/publico/zonas/:id/fixture', async (request) => {
@@ -191,9 +191,9 @@ export async function publicoRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/publico/partidos/:id/estadisticas', async (request) => {
     const { id } = request.params as { id: string }
-    const partido = await getPrisma().partido.findUnique({ where: { id }, select: { publicada: true, torneo: { select: { visiblePublico: true, configuracionPublica: true } } } })
+    const partido = await getPrisma().partido.findUnique({ where: { id }, select: { publicada: true, equipoLocal: { select: { privado: true } }, equipoVisitante: { select: { privado: true } }, torneo: { select: { visiblePublico: true, configuracionPublica: true } } } })
     const c = config<ConfigPublica>(partido?.torneo?.configuracionPublica)
-    if (!partido?.publicada || (partido.torneo && (!partido.torneo.visiblePublico || c.mostrarEstadisticas !== true))) throw noEncontrado('Estadísticas')
+    if (!partido?.publicada || partido.equipoLocal?.privado || partido.equipoVisitante?.privado || (partido.torneo && (!partido.torneo.visiblePublico || c.mostrarEstadisticas !== true))) throw noEncontrado('Estadísticas')
     return { data: await estadisticasPartido(getPrisma(), id) }
   })
 }

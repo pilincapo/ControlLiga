@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { createHash } from 'node:crypto'
 import { setSessionCookie, clearSessionCookie } from '../auth/cookies.js'
 import {
   aMeResponder,
@@ -12,9 +13,9 @@ import {
 } from '../auth/servicio.js'
 import { autenticar, getAuth } from '../plugins/auth.js'
 import { noAutenticado } from '../http.js'
-import { autenticar as autenticarPassword } from '../plugins/auth.js'
 import { cambiarPassword, resetearPassword, solicitarReset, resetRateLimitado } from '../auth/password-reset.js'
 import { demasiadasSolicitudes } from '../http.js'
+import { loginIpRateLimiter, loginRateLimiter } from '../auth/rate-limiter.js'
 
 interface RegistroBody {
   email: string
@@ -49,6 +50,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   app.post('/auth/login', async (request, reply) => {
     const body = request.body as CredencialesBody
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
+    const emailHash = createHash('sha256').update(email).digest('hex')
+    const permitidoIp = loginIpRateLimiter.permitir(`login:ip:${request.ip}`)
+    const permitidoEmail = loginRateLimiter.permitir(`login:email:${emailHash}`)
+    if (!permitidoIp || !permitidoEmail) {
+      throw demasiadasSolicitudes()
+    }
     const emitida = await iniciarSesion(body, request)
     setSessionCookie(reply, emitida.token, emitida.expiresAt)
     return reply.send({ data: aSesionResponder(emitida) })
@@ -98,7 +106,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ data: { mensaje: 'Contraseña actualizada. Iniciá sesión nuevamente' } })
   })
 
-  app.post('/auth/password/change', { preHandler: autenticarPassword }, async (request, reply) => {
+  app.post('/auth/password/change', { preHandler: autenticar }, async (request, reply) => {
     const body = request.body as ChangePasswordBody
     const auth = getAuth(request)
     await cambiarPassword(auth.usuarioId, body.passwordActual, body.passwordNueva)

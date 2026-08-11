@@ -72,7 +72,13 @@ export async function validarSesion(request: FastifyRequest): Promise<ContextoAu
     where: { id: sesion.usuarioId },
     include: INCLUDE_USUARIO_SESION,
   })
-  if (!usuario) {
+  if (!usuario || !usuario.activo) {
+    if (usuario) {
+      await prisma.session.updateMany({
+        where: { usuarioId: usuario.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      })
+    }
     return null
   }
   return aContextoAuth(usuario)
@@ -107,6 +113,13 @@ export async function rotarSesion(request: FastifyRequest): Promise<SesionEmitid
     where: { id: sesion.usuarioId },
     include: INCLUDE_USUARIO_SESION,
   })
+  if (!usuario.activo) {
+    await prisma.session.updateMany({
+      where: { usuarioId: usuario.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+    return null
+  }
   await prisma.session.update({
     where: { id: sesion.id },
     data: { revokedAt: new Date() },

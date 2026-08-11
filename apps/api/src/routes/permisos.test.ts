@@ -239,11 +239,38 @@ describe('autorización por rol y alcance', () => {
     expect(res.statusCode).toBe(403)
   })
 
-  it('ADMINISTRADOR asigna roles y queda auditado', async () => {
+  it('ADMINISTRADOR no puede asignar alcance de otra organización', async () => {
     const res = await app.inject({
       method: 'POST',
       url: `/api/usuarios/${usuarioJugador.id}/roles`,
-      payload: { roles: [{ codigo: 'JUGADOR' }, { codigo: 'DELEGADO_TECNICO', equipoId: equipoA.id }] },
+      payload: { roles: [{ codigo: 'ADMINISTRADOR', organizacionId: orgB.id }] },
+      headers: conCookie(tokenAdmin),
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('ADMINISTRADOR no puede asignar DELEGADO_TECNICO ni editarse roles propios', async () => {
+    const vertical = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${usuarioJugador.id}/roles`,
+      payload: { roles: [{ codigo: 'DELEGADO_TECNICO' }] },
+      headers: conCookie(tokenAdmin),
+    })
+    expect(vertical.statusCode).toBe(403)
+    const propio = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${usuarioAdmin.id}/roles`,
+      payload: { roles: [{ codigo: 'ADMINISTRADOR', organizacionId: orgA.id }] },
+      headers: conCookie(tokenAdmin),
+    })
+    expect(propio.statusCode).toBe(403)
+  })
+
+  it('ADMINISTRADOR asigna roles de su organización y queda auditado', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/usuarios/${usuarioJugador.id}/roles`,
+      payload: { roles: [{ codigo: 'JUGADOR' }, { codigo: 'ADMINISTRADOR', organizacionId: orgA.id }] },
       headers: conCookie(tokenAdmin),
     })
     expect(res.statusCode).toBe(200)

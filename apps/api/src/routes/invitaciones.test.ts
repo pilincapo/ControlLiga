@@ -364,9 +364,9 @@ describe('invitaciones de jugador y cuerpo técnico (FASE 13)', () => {
       payload: { email: cuerpoUser.email, rolEnEquipo: 'TECNICO', mensaje: 'Te esperamos' },
       headers: conCookie(tokenDelegadoA),
     })
-    expect(res.statusCode).toBe(200)
-    expect(res.json().data.existe).toBe(true)
-    const inv = res.json().data.invitacion
+    expect(res.statusCode).toBe(202)
+    expect(res.json().data.mensaje).toContain('Si existe')
+    const inv = await getPrisma().invitacion.findFirstOrThrow({ where: { equipoId: equipoA.id, usuarioId: cuerpoUser.id, tipo: 'CUERPO_TECNICO' } })
     expect(inv.tipo).toBe('CUERPO_TECNICO')
     expect(inv.estado).toBe('PENDIENTE')
     expect(inv.rolEnEquipo).toBe('TECNICO')
@@ -376,7 +376,7 @@ describe('invitaciones de jugador y cuerpo técnico (FASE 13)', () => {
     expect(lista.some((n) => n.tipo === 'INVITACION_CUERPO_TECNICO' && n.entidadId === inv.id)).toBe(true)
   })
 
-  it('17. un email inexistente responde existe:false sin crear invitación', async () => {
+  it('17. email existente e inexistente responden igual sin enumerar cuentas', async () => {
     const antes = await getPrisma().invitacion.count()
     const res = await app.inject({
       method: 'POST',
@@ -384,8 +384,8 @@ describe('invitaciones de jugador y cuerpo técnico (FASE 13)', () => {
       payload: { email: `nadie-${suf}@test.dev`, rolEnEquipo: 'TECNICO' },
       headers: conCookie(tokenDelegadoA),
     })
-    expect(res.statusCode).toBe(200)
-    expect(res.json().data.existe).toBe(false)
+    expect(res.statusCode).toBe(202)
+    expect(res.json().data).toEqual({ mensaje: 'Si existe una cuenta elegible, recibirá una invitación' })
     expect(await getPrisma().invitacion.count()).toBe(antes)
   })
 
@@ -407,15 +407,15 @@ describe('invitaciones de jugador y cuerpo técnico (FASE 13)', () => {
     expect(rolInvalido.statusCode).toBe(400)
   })
 
-  it('19. una invitación de cuerpo duplicada pendiente es rechazada', async () => {
+  it('19. una invitación de cuerpo duplicada conserva respuesta uniforme', async () => {
     const res = await app.inject({
       method: 'POST',
       url: `/api/equipos/${equipoA.id}/invitaciones-cuerpo`,
       payload: { email: cuerpoUser.email, rolEnEquipo: 'TECNICO' },
       headers: conCookie(tokenDelegadoA),
     })
-    expect(res.statusCode).toBe(409)
-    expect(res.json().error.code).toBe('invitacion_pendiente')
+    expect(res.statusCode).toBe(202)
+    expect(res.json().data).toEqual({ mensaje: 'Si existe una cuenta elegible, recibirá una invitación' })
   })
 
   it('20. al aceptar, el usuario queda como miembro activo con el rol e invitadoPorId', async () => {
@@ -441,13 +441,13 @@ describe('invitaciones de jugador y cuerpo técnico (FASE 13)', () => {
   })
 
   it('21. rechazo de cuerpo técnico no crea membresía', async () => {
-    const inv = await app.inject({
+    await app.inject({
       method: 'POST',
       url: `/api/equipos/${equipoA.id}/invitaciones-cuerpo`,
       payload: { email: cuerpoRechaza.email, rolEnEquipo: 'AUXILIAR' },
       headers: conCookie(tokenDelegadoA),
     })
-    const id = inv.json().data.invitacion.id
+    const id = (await getPrisma().invitacion.findFirstOrThrow({ where: { equipoId: equipoA.id, usuarioId: cuerpoRechaza.id, tipo: 'CUERPO_TECNICO' } })).id
     const res = await app.inject({
       method: 'POST',
       url: `/api/invitaciones/${id}/responder`,
@@ -463,13 +463,13 @@ describe('invitaciones de jugador y cuerpo técnico (FASE 13)', () => {
   })
 
   it('22. revocación de invitación de cuerpo por un DELEGADO', async () => {
-    const inv = await app.inject({
+    await app.inject({
       method: 'POST',
       url: `/api/equipos/${equipoA.id}/invitaciones-cuerpo`,
       payload: { email: cuerpoRevocado.email, rolEnEquipo: 'AUXILIAR' },
       headers: conCookie(tokenDelegadoA),
     })
-    const id = inv.json().data.invitacion.id
+    const id = (await getPrisma().invitacion.findFirstOrThrow({ where: { equipoId: equipoA.id, usuarioId: cuerpoRevocado.id, tipo: 'CUERPO_TECNICO' } })).id
     const res = await app.inject({
       method: 'POST',
       url: `/api/invitaciones/${id}/revocar`,

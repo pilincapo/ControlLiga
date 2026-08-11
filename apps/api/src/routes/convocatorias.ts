@@ -321,7 +321,7 @@ export async function convocatoriasRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/publico/convocatorias', async () => {
     const convocatorias = await getPrisma().convocatoria.findMany({
-      where: { publicada: true, cancelada: false, OR: [{ partidoId: null }, { partido: { publicada: true, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] } }] },
+      where: { publicada: true, cancelada: false, equipo: { privado: false }, OR: [{ partidoId: null }, { partido: { publicada: true, equipoLocal: { privado: false }, equipoVisitante: { privado: false }, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] } }] },
       orderBy: { fecha: 'desc' },
        select: { id: true, fecha: true, lugar: true, hora: true, equipo: { select: { id: true, nombre: true, escudoUrl: true, configuracionPublica: true } }, _count: { select: { jugadores: true } } },
     })
@@ -331,7 +331,7 @@ export async function convocatoriasRoutes(app: FastifyInstance): Promise<void> {
   app.get('/publico/convocatorias/:id', async (request) => {
     const { id } = request.params as { id: string }
     const conv = await getPrisma().convocatoria.findUnique({
-      where: { id, publicada: true, cancelada: false, OR: [{ partidoId: null }, { partido: { publicada: true, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] } }] },
+      where: { id, publicada: true, cancelada: false, equipo: { privado: false }, OR: [{ partidoId: null }, { partido: { publicada: true, equipoLocal: { privado: false }, equipoVisitante: { privado: false }, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] } }] },
       include: {
          equipo: { select: { id: true, nombre: true, escudoUrl: true, configuracionPublica: true } },
         jugadores: { include: { equipoJugador: { select: { dorsal: true, jugador: { include: { persona: { select: { nombre: true, apellido: true } } } } } } }, orderBy: { orden: 'asc' } },
