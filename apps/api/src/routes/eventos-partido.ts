@@ -87,7 +87,7 @@ async function validarGoles(prisma: ReturnType<typeof getPrisma>, partidoId: str
   return (goles.find((g) => g.equipoId === partido.equipoLocalId)?._count ?? 0) === golesLocal && (goles.find((g) => g.equipoId === partido.equipoVisitanteId)?._count ?? 0) === golesVisitante
 }
 
-async function estadisticasPartido(prisma: ReturnType<typeof getPrisma>, partidoId: string) {
+export async function estadisticasPartido(prisma: ReturnType<typeof getPrisma>, partidoId: string) {
   const partido = await prisma.partido.findUnique({ where: { id: partidoId }, include: { eventos: { where: { anulado: false } }, formacionInstancias: { include: { jugadores: true } } } })
   if (!partido) throw noEncontrado('Partido')
   const ids = new Set<string>()
@@ -158,13 +158,6 @@ export async function eventosPartidoRoutes(app: FastifyInstance): Promise<void> 
     const eventos = await getPrisma().eventoPartido.findMany({ where: { partido: { torneoCategoriaId, estado: 'FINALIZADO', tipo: 'OFICIAL' }, tipo: 'TARJETA', anulado: false }, select: { jugadorId: true, subtipo: true } })
     const conteo = new Map<string, { amarillas: number; rojas: number }>(); eventos.forEach((e) => { if (!e.jugadorId) return; const v = conteo.get(e.jugadorId) ?? { amarillas: 0, rojas: 0 }; if (e.subtipo === 'AMARILLA') v.amarillas++; if (e.subtipo === 'ROJA') v.rojas++; conteo.set(e.jugadorId, v) })
     return { data: [...conteo].map(([jugadorId, v]) => ({ jugadorId, ...v })) }
-  })
-  app.get('/publico/partidos/:id/estadisticas', async (request) => {
-    const id = (request.params as { id: string }).id
-    const partido = await getPrisma().partido.findUnique({ where: { id }, select: { publicada: true, torneoId: true, torneo: { select: { visiblePublico: true, configuracionPublica: true } } } })
-    const config = partido?.torneo?.configuracionPublica as { mostrarEstadisticas?: boolean } | null | undefined
-    if (!partido?.publicada || (partido.torneoId && (!partido.torneo?.visiblePublico || config?.mostrarEstadisticas !== true))) throw noEncontrado('Estadísticas')
-    return { data: await estadisticasPartido(getPrisma(), id) }
   })
   app.get('/publico/torneo-categorias/:id/goleadores', async (request) => {
     const id = (request.params as { id: string }).id

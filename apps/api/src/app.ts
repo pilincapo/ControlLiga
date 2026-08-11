@@ -24,6 +24,7 @@ import { partidosRoutes } from './routes/partidos.js'
 import { fixtureRoutes } from './routes/fixture.js'
 import { eventosPartidoRoutes } from './routes/eventos-partido.js'
 import { cajaRoutes } from './routes/caja.js'
+import { publicoRoutes } from './routes/publico.js'
 
 export function buildApp() {
   const app = Fastify({ logger: true })
@@ -75,6 +76,7 @@ export function buildApp() {
   app.register(fixtureRoutes, { prefix: '/api' })
   app.register(eventosPartidoRoutes, { prefix: '/api' })
   app.register(cajaRoutes, { prefix: '/api' })
+  app.register(publicoRoutes, { prefix: '/api' })
 
   return app
 }

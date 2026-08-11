@@ -284,7 +284,7 @@ export async function formacionesRoutes(app: FastifyInstance): Promise<void> {
     const formacion = await prisma.formacion.findUnique({
       where: { id },
       include: {
-        equipo: { select: { id: true, nombre: true, escudoUrl: true } },
+         equipo: { select: { id: true, nombre: true, escudoUrl: true, configuracionPublica: true } },
         partido: { select: { id: true, tipo: true, fechaHora: true, lugar: true, equipoLocalId: true, equipoVisitanteId: true } },
         jugadores: {
           include: {
@@ -537,14 +537,14 @@ export async function formacionesRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/publico/formaciones', async () => {
     const formaciones = await getPrisma().formacion.findMany({
-      where: { publicada: true },
+      where: { publicada: true, OR: [{ partidoId: null }, { partido: { publicada: true, equipoLocal: { privado: false }, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] } }] },
       select: {
         id: true,
         nombre: true,
         esquema: true,
         formacionTipo: true,
         fecha: true,
-        equipo: { select: { id: true, nombre: true, escudoUrl: true } },
+         equipo: { select: { id: true, nombre: true, escudoUrl: true, configuracionPublica: true } },
       },
       orderBy: { fecha: 'desc' },
     })
@@ -555,7 +555,7 @@ export async function formacionesRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params as { id: string }
     const prisma = getPrisma()
     const formacion = await prisma.formacion.findUnique({
-      where: { id },
+      where: { id, publicada: true, OR: [{ partidoId: null }, { partido: { publicada: true, equipoLocal: { privado: false }, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] } }] },
       select: {
         id: true,
         nombre: true,
@@ -563,7 +563,7 @@ export async function formacionesRoutes(app: FastifyInstance): Promise<void> {
         formacionTipo: true,
         fecha: true,
         publicada: true,
-        equipo: { select: { id: true, nombre: true, escudoUrl: true } },
+         equipo: { select: { id: true, nombre: true, escudoUrl: true, configuracionPublica: true } },
         jugadores: {
           include: {
             equipoJugador: {
@@ -574,7 +574,7 @@ export async function formacionesRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     })
-    if (!formacion || !formacion.publicada) {
+    if (!formacion) {
       throw noEncontrado('Formación')
     }
     return {

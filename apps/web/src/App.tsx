@@ -16,6 +16,8 @@ import ConvocatoriasPage from './pages/convocatorias/ConvocatoriasPage'
 import ConvocatoriaPage from './pages/convocatorias/ConvocatoriaPage'
 import PartidosPage from './pages/partidos/PartidosPage'
 import PartidoPage from './pages/partidos/PartidoPage'
+import PublicPortalPage from './pages/PublicPortalPage'
+import PublicResourcePage from './pages/PublicResourcePage'
 import './index.css'
 
 function App() {
@@ -23,6 +25,13 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/publico/torneos" element={<PublicPortalPage />} />
+          <Route path="/publico/torneos/:id" element={<PublicPortalPage />} />
+          <Route path="/publico/torneos/:torneoId/temporadas/:id" element={<PublicResourcePage />} />
+          <Route path="/publico/competencias/:id" element={<PublicResourcePage />} />
+          <Route path="/publico/partidos/:id" element={<PublicResourcePage />} />
+          <Route path="/publico/equipos/:id" element={<PublicResourcePage />} />
+          <Route path="/" element={<PublicPortalPage />} />
           <Route
             path="/login"
             element={
@@ -129,7 +138,6 @@ function App() {
           />
           <Route path="/partidos" element={<RequireAuth><PartidosPage /></RequireAuth>} />
           <Route path="/partidos/:id" element={<RequireAuth><PartidoPage /></RequireAuth>} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>

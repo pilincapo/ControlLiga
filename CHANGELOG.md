@@ -2,6 +2,25 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.11.0] - 2026-08-11
+
+### Agregado
+
+- **FASE 11 — Portal público unificado**, documentada en `docs/fase-11-diseno-portal-publico.md`, sin cambios de schema ni migraciones.
+- Navegación pública de torneos, temporadas, categorías, zonas, fixture, tabla, partidos, estadísticas, goleadores, tarjetas, equipos, formaciones y convocatorias.
+- Proyecciones conservadoras de equipos y jugadores; `mostrarPlantel`, publicación de formaciones y `publicada && !cancelada` para convocatorias.
+- Landing responsive mobile-first con rutas públicas y acceso separado a login/registro.
+
+### Seguridad
+
+- Validación de torneo padre público en recursos descendientes y bloqueo de IDs cruzados.
+- Caja sin endpoints públicos; sin DNI, email, teléfono ni fecha de nacimiento.
+- Minutos permanecen `null` con `minutosNoDeterminados = true`.
+
+### Tests
+
+- 25 escenarios HTTP públicos de publicación, jerarquía, privacidad, estadísticas, caja y regresión de exposición de secretos.
+
 ## [0.10.0] - 2026-08-11
 
 ### Agregado

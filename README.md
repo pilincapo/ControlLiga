@@ -2,7 +2,7 @@
 
 Sistema de gestión de ligas de fútbol: torneos, equipos, jugadores, partidos, fixture, estadísticas y pagos.
 
-> **Estado actual**: esqueleto inicial. Todavía NO hay funcionalidades de negocio.
+> **Estado actual**: aplicación funcional hasta FASE 11, con administración autenticada y portal público de contenido publicado.
 
 ## Stack
 
@@ -78,7 +78,8 @@ Pasos: copiar `.env.example` a `.env` en cada carpeta y ajustar valores locales.
 1. `pnpm db:up` → luego `docker ps` (contenedor `controlliga-postgres` arriba).
 2. `pnpm dev` → abrir http://localhost:5173 (debe mostrar "API OK").
 3. Health del backend: http://localhost:3000/api/health
-4. Check de base de datos: http://localhost:3000/api/health/db (responde `{"data":{"database":"connected"}}` si Prisma conecta).
+4. Portal público: http://localhost:5173/publico/torneos
+5. Check de base de datos: http://localhost:3000/api/health/db (responde `{"data":{"database":"connected"}}` si Prisma conecta).
 
 ## Notas de versión
 

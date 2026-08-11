@@ -289,7 +289,7 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/publico/partidos', async () => {
     const partidos = await getPrisma().partido.findMany({
-      where: { publicada: true },
+      where: { publicada: true, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] },
       include: { equipoLocal: { select: { nombre: true, escudoUrl: true } }, equipoVisitante: { select: { nombre: true, escudoUrl: true } } },
       orderBy: { fechaHora: 'desc' },
     })
@@ -299,10 +299,10 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
   app.get('/publico/partidos/:id', async (request) => {
     const { id } = request.params as { id: string }
     const partido = await getPrisma().partido.findUnique({
-      where: { id },
+      where: { id, publicada: true, OR: [{ torneoId: null }, { torneo: { visiblePublico: true } }] },
       include: { equipoLocal: { select: { nombre: true, escudoUrl: true } }, equipoVisitante: { select: { nombre: true, escudoUrl: true } } },
     })
-    if (!partido || !partido.publicada) throw noEncontrado('Partido')
+    if (!partido) throw noEncontrado('Partido')
     return { data: partido }
   })
 }
