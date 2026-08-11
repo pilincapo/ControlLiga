@@ -26,8 +26,25 @@ export interface PartidoDetalle {
   equipoVisitante: { id: string; nombre: string; escudoUrl: string | null } | null
   torneo: { id: string; nombre: string } | null
   temporada: { id: string; nombre: string } | null
-  formacionInstancias: Array<{ id: string; jugadores: Array<{ jugador: { persona: { nombre: string; apellido: string } }; dorsalSnapshot: number | null; nombreSnapshot: string; esTitular: boolean; posicion: string }> }>
-  convocatorias: Array<{ id: string; cancelada: boolean; jugadores: Array<{ estado: string; equipoJugador: { jugador: { persona: { nombre: string; apellido: string } } } }> }>
+  formacionInstancias: Array<{
+    id: string
+    jugadores: Array<{
+      jugadorId: string
+      jugador: { persona: { nombre: string; apellido: string } }
+      dorsalSnapshot: number | null
+      nombreSnapshot: string
+      esTitular: boolean
+      posicion: string
+    }>
+  }>
+  convocatorias: Array<{
+    id: string
+    cancelada: boolean
+    jugadores: Array<{
+      estado: string
+      equipoJugador: { jugador: { persona: { nombre: string; apellido: string } } }
+    }>
+  }>
 }
 
 export interface EventoPartido {
@@ -43,5 +60,13 @@ export interface EventoPartido {
 }
 
 export interface EstadisticasPartido {
-  jugadores: Array<{ jugadorId: string; goles: number; asistencias: number; amarillas: number; rojas: number; minutos: number | null; minutosNoDeterminados: boolean }>
+  jugadores: Array<{
+    jugadorId: string
+    goles: number
+    asistencias: number
+    amarillas: number
+    rojas: number
+    minutos: number | null
+    minutosNoDeterminados: boolean
+  }>
 }

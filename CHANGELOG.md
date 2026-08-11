@@ -2,6 +2,18 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.15.0] - 2026-08-11
+
+### Cambiado
+
+- FASE 15 UX beta: primitives reutilizables de estados, toast, confirmación accesible, badges y tablas responsive; navegación privada filtrada por permisos y adaptada a móvil.
+- Fixture y tabla incorporan estados legibles, carga/error explícitos y generación o regeneración confirmada para administradores, sin modificar contratos backend.
+- Portal público reemplaza JSON crudo por presentación legible; categorías reemplazan prompts de configuración por formulario visible y validable.
+- Tests monorepo se ejecutan con un workspace a la vez para evitar contención entre Prisma/API y jsdom/web que agotaba el timeout de un test asíncrono existente.
+- Eventos de partido incorporan alta, corrección y anulación confirmada para goles, asistencias, tarjetas y sustituciones; formularios de zonas y jugadores en competición reemplazan prompts nativos.
+- Flujos beta web eliminan diálogos nativos: bajas, cambios de rol y eliminación de formación usan formularios o ConfirmDialog reutilizable.
+- Cobertura UX agrega navegación filtrada por permisos y generación de fixture con confirmación, cancelación y permiso de administración.
+
 ## [0.14.0] - 2026-08-11
 
 ### Seguridad

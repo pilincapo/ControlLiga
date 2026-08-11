@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { apiFetch } from '../../utils/api'
 import type { JugadorPlantilla, Participacion } from './tipos'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 interface Props {
   participaciones: Participacion[]
@@ -15,6 +16,9 @@ export default function JugadoresSection({ participaciones, onRecargar }: Props)
   const [dorsal, setDorsal] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [mensaje, setMensaje] = useState<string | null>(null)
+  const [jugadorEditando, setJugadorEditando] = useState<JugadorPlantilla | null>(null)
+  const [dorsalEdicion, setDorsalEdicion] = useState('')
+  const [bajaPendiente, setBajaPendiente] = useState<string | null>(null)
 
   async function cargar(pid: string) {
     setParticipacionId(pid)
@@ -53,15 +57,16 @@ export default function JugadoresSection({ participaciones, onRecargar }: Props)
     }
   }
 
-  async function cambiarDorsal(id: string, actual: number | null) {
-    const nuevo = window.prompt('Dorsal', String(actual ?? ''))
-    if (nuevo === null) return
+  async function cambiarDorsal(e: FormEvent) {
+    e.preventDefault()
+    if (!jugadorEditando) return
     try {
-      await apiFetch(`/jugador-participaciones/${id}`, {
+      await apiFetch(`/jugador-participaciones/${jugadorEditando.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ dorsal: nuevo === '' ? null : Number(nuevo) }),
+        body: JSON.stringify({ dorsal: dorsalEdicion === '' ? null : Number(dorsalEdicion) }),
       })
       await cargar(participacionId)
+      setJugadorEditando(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo modificar el dorsal')
     }
@@ -85,7 +90,11 @@ export default function JugadoresSection({ participaciones, onRecargar }: Props)
         <h3>Participación</h3>
         <div className="campo">
           <label htmlFor="j-participacion">Equipo</label>
-          <select id="j-participacion" value={participacionId} onChange={(e) => void cargar(e.target.value)}>
+          <select
+            id="j-participacion"
+            value={participacionId}
+            onChange={(e) => void cargar(e.target.value)}
+          >
             <option value="">Seleccionar equipo…</option>
             {participaciones
               .filter((p) => p.estado === 'CONFIRMADO' || p.estado === 'INSCRIPTO')
@@ -105,11 +114,22 @@ export default function JugadoresSection({ participaciones, onRecargar }: Props)
             <form onSubmit={agregar}>
               <div className="campo">
                 <label htmlFor="j-jugador">ID de jugador</label>
-                <input id="j-jugador" value={jugadorId} onChange={(e) => setJugadorId(e.target.value)} placeholder="uuid del jugador" required />
+                <input
+                  id="j-jugador"
+                  value={jugadorId}
+                  onChange={(e) => setJugadorId(e.target.value)}
+                  placeholder="uuid del jugador"
+                  required
+                />
               </div>
               <div className="campo">
                 <label htmlFor="j-dorsal">Dorsal (opcional)</label>
-                <input id="j-dorsal" value={dorsal} onChange={(e) => setDorsal(e.target.value)} type="number" />
+                <input
+                  id="j-dorsal"
+                  value={dorsal}
+                  onChange={(e) => setDorsal(e.target.value)}
+                  type="number"
+                />
               </div>
               <button className="boton boton-primario" type="submit">
                 Agregar
@@ -118,19 +138,43 @@ export default function JugadoresSection({ participaciones, onRecargar }: Props)
           </div>
           <div className="tarjeta">
             <h3>Plantilla en competición</h3>
+            {jugadorEditando && (
+              <form className="acciones" onSubmit={cambiarDorsal}>
+                <label htmlFor="dorsal-edicion">Dorsal</label>
+                <input
+                  id="dorsal-edicion"
+                  type="number"
+                  value={dorsalEdicion}
+                  onChange={(e) => setDorsalEdicion(e.target.value)}
+                />
+                <button className="boton boton-primario">Guardar</button>
+                <button className="boton" type="button" onClick={() => setJugadorEditando(null)}>
+                  Cancelar
+                </button>
+              </form>
+            )}
             {jugadores.length === 0 && <p>Sin jugadores en la plantilla.</p>}
             <ul className="lista">
               {jugadores.map((j) => (
                 <li key={j.id}>
-                  {j.jugador.persona.nombre} {j.jugador.persona.apellido} · dorsal {j.dorsal ?? '—'} ·{' '}
-                  {j.activo ? 'activo' : `baja ${j.fechaBaja ? new Date(j.fechaBaja).toLocaleDateString() : ''}`}
+                  {j.jugador.persona.nombre} {j.jugador.persona.apellido} · dorsal {j.dorsal ?? '—'}{' '}
+                  ·{' '}
+                  {j.activo
+                    ? 'activo'
+                    : `baja ${j.fechaBaja ? new Date(j.fechaBaja).toLocaleDateString() : ''}`}
                   {j.activo && (
                     <>
                       {' '}
-                      <button className="boton" onClick={() => void cambiarDorsal(j.id, j.dorsal)}>
+                      <button
+                        className="boton"
+                        onClick={() => {
+                          setJugadorEditando(j)
+                          setDorsalEdicion(j.dorsal?.toString() ?? '')
+                        }}
+                      >
                         Dorsal
                       </button>{' '}
-                      <button className="boton" onClick={() => void darBaja(j.id)}>
+                      <button className="boton" onClick={() => setBajaPendiente(j.id)}>
                         Baja
                       </button>
                     </>
@@ -141,6 +185,19 @@ export default function JugadoresSection({ participaciones, onRecargar }: Props)
           </div>
         </>
       )}
+      <ConfirmDialog
+        abierto={bajaPendiente !== null}
+        titulo="Dar de baja jugador"
+        detalle="La baja conserva historial de participación."
+        confirmar="Dar de baja"
+        onCancelar={() => setBajaPendiente(null)}
+        onConfirmar={() => {
+          if (bajaPendiente) {
+            void darBaja(bajaPendiente)
+            setBajaPendiente(null)
+          }
+        }}
+      />
     </div>
   )
 }

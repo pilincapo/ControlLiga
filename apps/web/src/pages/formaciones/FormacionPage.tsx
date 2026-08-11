@@ -4,6 +4,8 @@ import type { FormEvent } from 'react'
 import { TIPOS_FORMACION } from '@controlliga/shared'
 import { apiFetch } from '../../utils/api'
 import Layout from '../../components/Layout'
+import ConfirmDialog from '../../components/ConfirmDialog'
+import ToastRegion from '../../components/ToastRegion'
 import type { FormacionDetalle, JugadorPlantel } from './tipos'
 
 interface Fila {
@@ -29,6 +31,7 @@ export default function FormacionPage() {
   const [notas, setNotas] = useState('')
   const [plantel, setPlantel] = useState<JugadorPlantel[]>([])
   const [filas, setFilas] = useState<Fila[]>([])
+  const [confirmarEliminacion, setConfirmarEliminacion] = useState(false)
 
   const recargar = async () => {
     const data = await apiFetch<FormacionDetalle>(`/formaciones/${id}`)
@@ -110,7 +113,13 @@ export default function FormacionPage() {
     try {
       await apiFetch(`/formaciones/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ nombre, esquema: esquema || undefined, formacionTipo, notas: notas || undefined, jugadores }),
+        body: JSON.stringify({
+          nombre,
+          esquema: esquema || undefined,
+          formacionTipo,
+          notas: notas || undefined,
+          jugadores,
+        }),
       })
       setEditando(false)
       setMensaje('Formación actualizada')
@@ -124,7 +133,10 @@ export default function FormacionPage() {
     setError(null)
     setMensaje(null)
     try {
-      await apiFetch(url, { method: metodo, body: payload !== undefined ? JSON.stringify(payload) : undefined })
+      await apiFetch(url, {
+        method: metodo,
+        body: payload !== undefined ? JSON.stringify(payload) : undefined,
+      })
       if (exito) setMensaje(exito)
       await recargar()
     } catch (err) {
@@ -155,21 +167,52 @@ export default function FormacionPage() {
         <Link className="enlace" to={`/equipos/${formacion.equipo.id}`}>
           {formacion.equipo.nombre}
         </Link>{' '}
-        · {formacion.esquema ?? formacion.formacionTipo} · {formacion.publicada ? 'pública' : 'privada'}
+        · {formacion.esquema ?? formacion.formacionTipo} ·{' '}
+        {formacion.publicada ? 'pública' : 'privada'}
       </p>
       {error && <p className="error">{error}</p>}
-      {mensaje && <p className="mensaje">{mensaje}</p>}
+      <ToastRegion mensaje={mensaje} />
 
       <p>
-        <button className="boton" onClick={() => void accion(`/formaciones/${formacion.id}/clonar`, 'POST', undefined, 'Formación clonada')}>
+        <button
+          className="boton"
+          onClick={() =>
+            void accion(
+              `/formaciones/${formacion.id}/clonar`,
+              'POST',
+              undefined,
+              'Formación clonada',
+            )
+          }
+        >
           Clonar
         </button>{' '}
         {formacion.publicada ? (
-          <button className="boton" onClick={() => void accion(`/formaciones/${formacion.id}/despublicar`, 'POST', undefined, 'Formación despublicada')}>
+          <button
+            className="boton"
+            onClick={() =>
+              void accion(
+                `/formaciones/${formacion.id}/despublicar`,
+                'POST',
+                undefined,
+                'Formación despublicada',
+              )
+            }
+          >
             Despublicar
           </button>
         ) : (
-          <button className="boton" onClick={() => void accion(`/formaciones/${formacion.id}/publicar`, 'POST', undefined, 'Formación publicada')}>
+          <button
+            className="boton"
+            onClick={() =>
+              void accion(
+                `/formaciones/${formacion.id}/publicar`,
+                'POST',
+                undefined,
+                'Formación publicada',
+              )
+            }
+          >
             Publicar
           </button>
         )}{' '}
@@ -178,12 +221,7 @@ export default function FormacionPage() {
             Editar
           </button>
         )}{' '}
-        <button
-          className="boton"
-          onClick={() => {
-            if (window.confirm('¿Eliminar la formación?')) void accion(`/formaciones/${formacion.id}`, 'DELETE').then(() => navigate('/formaciones'))
-          }}
-        >
+        <button className="boton boton-peligro" onClick={() => setConfirmarEliminacion(true)}>
           Eliminar
         </button>
       </p>
@@ -194,11 +232,20 @@ export default function FormacionPage() {
           <form onSubmit={guardar}>
             <div className="campo">
               <label htmlFor="ef-nombre">Nombre</label>
-              <input id="ef-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+              <input
+                id="ef-nombre"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                required
+              />
             </div>
             <div className="campo">
               <label htmlFor="ef-tipo">Tipo de fútbol</label>
-              <select id="ef-tipo" value={formacionTipo} onChange={(e) => setFormacionTipo(e.target.value)}>
+              <select
+                id="ef-tipo"
+                value={formacionTipo}
+                onChange={(e) => setFormacionTipo(e.target.value)}
+              >
                 {TIPOS_FORMACION.map((t) => (
                   <option key={t} value={t}>
                     {t}
@@ -235,9 +282,24 @@ export default function FormacionPage() {
                           value={filas[idx]?.equipoJugadorId ?? ''}
                           onChange={(e) => {
                             if (idx >= 0) {
-                              setFila(idx, { equipoJugadorId: e.target.value || '', nombre: j.nombre, dorsal: j.dorsal })
+                              setFila(idx, {
+                                equipoJugadorId: e.target.value || '',
+                                nombre: j.nombre,
+                                dorsal: j.dorsal,
+                              })
                             } else {
-                              setFilas((fs) => [...fs, { equipoJugadorId: j.id, nombre: j.nombre, dorsal: j.dorsal, titular: false, posicion: '', x: '', y: '' }])
+                              setFilas((fs) => [
+                                ...fs,
+                                {
+                                  equipoJugadorId: j.id,
+                                  nombre: j.nombre,
+                                  dorsal: j.dorsal,
+                                  titular: false,
+                                  posicion: '',
+                                  x: '',
+                                  y: '',
+                                },
+                              ])
                             }
                           }}
                         >
@@ -257,13 +319,26 @@ export default function FormacionPage() {
                         />
                       </td>
                       <td>
-                        <input value={filas[idx]?.posicion ?? ''} onChange={(e) => idx >= 0 && setFila(idx, { posicion: e.target.value })} />
+                        <input
+                          value={filas[idx]?.posicion ?? ''}
+                          onChange={(e) => idx >= 0 && setFila(idx, { posicion: e.target.value })}
+                        />
                       </td>
                       <td>
-                        <input type="number" style={{ width: 60 }} value={filas[idx]?.x ?? ''} onChange={(e) => idx >= 0 && setFila(idx, { x: e.target.value })} />
+                        <input
+                          type="number"
+                          style={{ width: 60 }}
+                          value={filas[idx]?.x ?? ''}
+                          onChange={(e) => idx >= 0 && setFila(idx, { x: e.target.value })}
+                        />
                       </td>
                       <td>
-                        <input type="number" style={{ width: 60 }} value={filas[idx]?.y ?? ''} onChange={(e) => idx >= 0 && setFila(idx, { y: e.target.value })} />
+                        <input
+                          type="number"
+                          style={{ width: 60 }}
+                          value={filas[idx]?.y ?? ''}
+                          onChange={(e) => idx >= 0 && setFila(idx, { y: e.target.value })}
+                        />
                       </td>
                     </tr>
                   )
@@ -285,7 +360,8 @@ export default function FormacionPage() {
             <ul className="lista">
               {titulares.map((j) => (
                 <li key={j.id}>
-                  {j.nombre} · dorsal {j.dorsal ?? '—'} · {j.posicion} · ({j.x ?? '—'}, {j.y ?? '—'})
+                  {j.nombre} · dorsal {j.dorsal ?? '—'} · {j.posicion} · ({j.x ?? '—'}, {j.y ?? '—'}
+                  )
                 </li>
               ))}
               {titulares.length === 0 && <li>Sin titulares.</li>}
@@ -296,7 +372,8 @@ export default function FormacionPage() {
             <ul className="lista">
               {suplentes.map((j) => (
                 <li key={j.id}>
-                  {j.nombre} · dorsal {j.dorsal ?? '—'} · {j.posicion} · ({j.x ?? '—'}, {j.y ?? '—'})
+                  {j.nombre} · dorsal {j.dorsal ?? '—'} · {j.posicion} · ({j.x ?? '—'}, {j.y ?? '—'}
+                  )
                 </li>
               ))}
               {suplentes.length === 0 && <li>Sin suplentes.</li>}
@@ -315,6 +392,21 @@ export default function FormacionPage() {
           </div>
         </>
       )}
+      <ConfirmDialog
+        abierto={confirmarEliminacion}
+        titulo="Eliminar formación"
+        detalle={`Eliminarás ${formacion.nombre}. Esta acción no se puede deshacer.`}
+        confirmar="Eliminar formación"
+        onCancelar={() => setConfirmarEliminacion(false)}
+        onConfirmar={() => {
+          void accion(
+            `/formaciones/${formacion.id}`,
+            'DELETE',
+            undefined,
+            'Formación eliminada',
+          ).then(() => navigate('/formaciones'))
+        }}
+      />
     </Layout>
   )
 }

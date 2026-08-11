@@ -20,7 +20,7 @@
     "dev:api": "pnpm --filter @controlliga/api dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
+    "test": "pnpm --workspace-concurrency=1 -r test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

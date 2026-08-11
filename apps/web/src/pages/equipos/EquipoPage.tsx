@@ -4,7 +4,15 @@ import type { FormEvent } from 'react'
 import { apiFetch } from '../../utils/api'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../auth/useAuth'
-import type { AdministradorEquipo, EquipoDetalle, InvitacionEquipo, JugadorPlantelEquipo } from './tipos'
+import ConfirmDialog from '../../components/ConfirmDialog'
+import PermissionGate from '../../components/PermissionGate'
+import ToastRegion from '../../components/ToastRegion'
+import type {
+  AdministradorEquipo,
+  EquipoDetalle,
+  InvitacionEquipo,
+  JugadorPlantelEquipo,
+} from './tipos'
 
 const ESTADOS_JUGADOR = ['ACTIVO', 'INACTIVO', 'LESIONADO', 'SUSPENDIDO', 'INVITADO']
 
@@ -58,7 +66,10 @@ export default function EquipoPage() {
     setError(null)
     setMensaje(null)
     try {
-      await apiFetch(url, { method: metodo, body: payload !== undefined ? JSON.stringify(payload) : undefined })
+      await apiFetch(url, {
+        method: metodo,
+        body: payload !== undefined ? JSON.stringify(payload) : undefined,
+      })
       if (exito) setMensaje(exito)
       await recargar()
     } catch (err) {
@@ -87,7 +98,13 @@ export default function EquipoPage() {
   return (
     <Layout>
       <h2>
-        {equipo.escudoUrl && <img src={equipo.escudoUrl} alt="" style={{ height: 40, verticalAlign: 'middle', marginRight: 8 }} />}
+        {equipo.escudoUrl && (
+          <img
+            src={equipo.escudoUrl}
+            alt=""
+            style={{ height: 40, verticalAlign: 'middle', marginRight: 8 }}
+          />
+        )}
         {equipo.nombre}
       </h2>
       <p>
@@ -95,15 +112,20 @@ export default function EquipoPage() {
         {rolEnEquipo ? ` · tu rol: ${rolEnEquipo}` : ''}
       </p>
       <p>
-        Jugadores: <strong>{equipo.cantidades.jugadores}</strong> · Bajas: {equipo.cantidades.bajas} · Delegados:{' '}
-        {equipo.cantidades.delegados}
+        Jugadores: <strong>{equipo.cantidades.jugadores}</strong> · Bajas: {equipo.cantidades.bajas}{' '}
+        · Delegados: {equipo.cantidades.delegados}
       </p>
       {error && <p className="error">{error}</p>}
-      {mensaje && <p className="mensaje">{mensaje}</p>}
+      <ToastRegion mensaje={mensaje} />
 
       <nav className="navbar">
         {secciones.map((s) => (
-          <button key={s.clave} className="boton" onClick={() => setSeccion(s.clave)} style={seccion === s.clave ? { borderColor: '#2563eb' } : undefined}>
+          <button
+            key={s.clave}
+            className="boton"
+            onClick={() => setSeccion(s.clave)}
+            style={seccion === s.clave ? { borderColor: '#2563eb' } : undefined}
+          >
             {s.titulo}
           </button>
         ))}
@@ -115,7 +137,11 @@ export default function EquipoPage() {
         </span>
       ))}
 
-      {puedeVerCaja && seccion !== 'caja' && <button className="boton" onClick={() => setSeccion('caja')}>Abrir Caja</button>}
+      {puedeVerCaja && seccion !== 'caja' && (
+        <button className="boton" onClick={() => setSeccion('caja')}>
+          Abrir Caja
+        </button>
+      )}
 
       {seccion === 'plantel' && (
         <PlantelSection
@@ -143,43 +169,193 @@ export default function EquipoPage() {
         </div>
       )}
 
-      {seccion === 'administradores' && esDelegado && (
-        <AdministradoresSection
-          administradores={equipo.administradores}
-          equipoId={equipo.id}
-          onAccion={accion}
-        />
+      {seccion === 'administradores' && (
+        <PermissionGate
+          permitido={esDelegado}
+          alternativo={<p className="tarjeta">No tenés permiso para administrar este equipo.</p>}
+        >
+          <AdministradoresSection
+            administradores={equipo.administradores}
+            equipoId={equipo.id}
+            onAccion={accion}
+          />
+        </PermissionGate>
       )}
 
       {seccion === 'config' && esDelegado && (
-        <ConfigSection equipo={equipo} onRecargar={recargar} setError={setError} setMensaje={setMensaje} />
+        <ConfigSection
+          equipo={equipo}
+          onRecargar={recargar}
+          setError={setError}
+          setMensaje={setMensaje}
+        />
       )}
 
-      {seccion === 'caja' && <CajaSection equipoId={equipo.id} puedeAdministrar={esDelegado} plantel={plantel} />}
+      {seccion === 'caja' && (
+        <CajaSection equipoId={equipo.id} puedeAdministrar={esDelegado} plantel={plantel} />
+      )}
 
       {seccion === 'invitaciones' && (
-        <InvitacionesSection equipoId={equipo.id} puedeInvitarJugador={esDelegado || rolEnEquipo === 'TECNICO'} puedeInvitarCuerpo={esDelegado} />
+        <InvitacionesSection
+          equipoId={equipo.id}
+          puedeInvitarJugador={esDelegado || rolEnEquipo === 'TECNICO'}
+          puedeInvitarCuerpo={esDelegado}
+        />
       )}
     </Layout>
   )
 }
 
-function CajaSection({ equipoId, puedeAdministrar, plantel }: { equipoId: string; puedeAdministrar: boolean; plantel: JugadorPlantelEquipo[] }) {
-  const [caja, setCaja] = useState<{ resumen: { saldoActual: number; totalPendiente: number; totalIngresosPagados: number; totalGastosPagados: number }; movimientos: Array<{ id: string; tipo: string; concepto: string; importe: string; estado: string; fecha: string; jugadorId: string | null }> } | null>(null)
+function CajaSection({
+  equipoId,
+  puedeAdministrar,
+  plantel,
+}: {
+  equipoId: string
+  puedeAdministrar: boolean
+  plantel: JugadorPlantelEquipo[]
+}) {
+  const [caja, setCaja] = useState<{
+    resumen: {
+      saldoActual: number
+      totalPendiente: number
+      totalIngresosPagados: number
+      totalGastosPagados: number
+    }
+    movimientos: Array<{
+      id: string
+      tipo: string
+      concepto: string
+      importe: string
+      estado: string
+      fecha: string
+      jugadorId: string | null
+    }>
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tipo, setTipo] = useState('INGRESO')
   const [concepto, setConcepto] = useState('')
   const [importe, setImporte] = useState('')
   const [jugadorId, setJugadorId] = useState('')
-  const cargar = useCallback(async () => { try { setCaja(await apiFetch(`/equipos/${equipoId}/caja`)) } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo cargar caja') } }, [equipoId])
+  const cargar = useCallback(async () => {
+    try {
+      setCaja(await apiFetch(`/equipos/${equipoId}/caja`))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cargar caja')
+    }
+  }, [equipoId])
   useEffect(() => {
     let activo = true
-    apiFetch<NonNullable<typeof caja>>(`/equipos/${equipoId}/caja`).then((data) => { if (activo) setCaja(data) }).catch((err) => { if (activo) setError(err instanceof Error ? err.message : 'No se pudo cargar caja') })
-    return () => { activo = false }
+    apiFetch<NonNullable<typeof caja>>(`/equipos/${equipoId}/caja`)
+      .then((data) => {
+        if (activo) setCaja(data)
+      })
+      .catch((err) => {
+        if (activo) setError(err instanceof Error ? err.message : 'No se pudo cargar caja')
+      })
+    return () => {
+      activo = false
+    }
   }, [equipoId])
-  async function crear(e: FormEvent) { e.preventDefault(); try { await apiFetch(`/equipos/${equipoId}/caja`, { method: 'POST', body: JSON.stringify({ tipo, categoria: tipo === 'INGRESO' ? 'CUOTA' : 'OTROS', concepto, importe: Number(importe), jugadorId: jugadorId || undefined }) }); setConcepto(''); setImporte(''); await cargar() } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo crear movimiento') } }
-  async function estado(id: string, nuevo: string) { try { await apiFetch(`/movimientos-caja/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado: nuevo }) }); await cargar() } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo cambiar estado') } }
-  return <div className="tarjeta"><h3>Caja privada</h3><p>Solo miembros autorizados ven importes, conceptos y movimientos.</p>{error && <p className="error">{error}</p>} {caja && <><p>Saldo cobrado: <strong>{caja.resumen.saldoActual}</strong> · Pendiente: <strong>{caja.resumen.totalPendiente}</strong> · Ingresos: {caja.resumen.totalIngresosPagados} · Gastos: {caja.resumen.totalGastosPagados}</p>{puedeAdministrar && <form onSubmit={crear}><select value={tipo} onChange={(e) => setTipo(e.target.value)}><option>INGRESO</option><option>EGRESO</option></select><input value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Concepto" required /><input value={importe} onChange={(e) => setImporte(e.target.value)} placeholder="Importe" type="number" min="0.01" step="0.01" required /><select value={jugadorId} onChange={(e) => setJugadorId(e.target.value)}><option value="">Sin jugador</option>{plantel.map((j) => <option key={j.jugadorId} value={j.jugadorId}>{j.nombre}</option>)}</select><button className="boton boton-primario">Registrar</button></form>}{<ul className="lista">{caja.movimientos.map((m) => <li key={m.id}>{new Date(m.fecha).toLocaleDateString()} · {m.tipo} · {m.concepto} · {m.importe} · {m.estado}{puedeAdministrar && m.estado === 'PENDIENTE' && <button className="boton" onClick={() => void estado(m.id, 'PAGADO')}>Marcar pago</button>}{puedeAdministrar && m.estado !== 'ANULADO' && <button className="boton" onClick={() => void estado(m.id, 'ANULADO')}>Anular</button>}</li>)}</ul>}</>}</div>
+  async function crear(e: FormEvent) {
+    e.preventDefault()
+    try {
+      await apiFetch(`/equipos/${equipoId}/caja`, {
+        method: 'POST',
+        body: JSON.stringify({
+          tipo,
+          categoria: tipo === 'INGRESO' ? 'CUOTA' : 'OTROS',
+          concepto,
+          importe: Number(importe),
+          jugadorId: jugadorId || undefined,
+        }),
+      })
+      setConcepto('')
+      setImporte('')
+      await cargar()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear movimiento')
+    }
+  }
+  async function estado(id: string, nuevo: string) {
+    try {
+      await apiFetch(`/movimientos-caja/${id}/estado`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado: nuevo }),
+      })
+      await cargar()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cambiar estado')
+    }
+  }
+  return (
+    <div className="tarjeta">
+      <h3>Caja privada</h3>
+      <p>Solo miembros autorizados ven importes, conceptos y movimientos.</p>
+      {error && <p className="error">{error}</p>}{' '}
+      {caja && (
+        <>
+          <p>
+            Saldo cobrado: <strong>{caja.resumen.saldoActual}</strong> · Pendiente:{' '}
+            <strong>{caja.resumen.totalPendiente}</strong> · Ingresos:{' '}
+            {caja.resumen.totalIngresosPagados} · Gastos: {caja.resumen.totalGastosPagados}
+          </p>
+          {puedeAdministrar && (
+            <form onSubmit={crear}>
+              <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
+                <option>INGRESO</option>
+                <option>EGRESO</option>
+              </select>
+              <input
+                value={concepto}
+                onChange={(e) => setConcepto(e.target.value)}
+                placeholder="Concepto"
+                required
+              />
+              <input
+                value={importe}
+                onChange={(e) => setImporte(e.target.value)}
+                placeholder="Importe"
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+              />
+              <select value={jugadorId} onChange={(e) => setJugadorId(e.target.value)}>
+                <option value="">Sin jugador</option>
+                {plantel.map((j) => (
+                  <option key={j.jugadorId} value={j.jugadorId}>
+                    {j.nombre}
+                  </option>
+                ))}
+              </select>
+              <button className="boton boton-primario">Registrar</button>
+            </form>
+          )}
+          {
+            <ul className="lista">
+              {caja.movimientos.map((m) => (
+                <li key={m.id}>
+                  {new Date(m.fecha).toLocaleDateString()} · {m.tipo} · {m.concepto} · {m.importe} ·{' '}
+                  {m.estado}
+                  {puedeAdministrar && m.estado === 'PENDIENTE' && (
+                    <button className="boton" onClick={() => void estado(m.id, 'PAGADO')}>
+                      Marcar pago
+                    </button>
+                  )}
+                  {puedeAdministrar && m.estado !== 'ANULADO' && (
+                    <button className="boton" onClick={() => void estado(m.id, 'ANULADO')}>
+                      Anular
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          }
+        </>
+      )}
+    </div>
+  )
 }
 
 function PlantelSection({
@@ -198,6 +374,10 @@ function PlantelSection({
   const [apellidoNuevo, setApellidoNuevo] = useState('')
   const [dniNuevo, setDniNuevo] = useState('')
   const [dorsalNuevo, setDorsalNuevo] = useState('')
+  const [jugadorEditando, setJugadorEditando] = useState<JugadorPlantelEquipo | null>(null)
+  const [dorsalEdicion, setDorsalEdicion] = useState('')
+  const [estadoEdicion, setEstadoEdicion] = useState('ACTIVO')
+  const [bajaPendiente, setBajaPendiente] = useState<JugadorPlantelEquipo | null>(null)
 
   async function incorporar(e: FormEvent) {
     e.preventDefault()
@@ -222,16 +402,31 @@ function PlantelSection({
           <h3>Incorporar jugador</h3>
           <form onSubmit={incorporar}>
             <div className="campo">
-              <label htmlFor="pl-jugadorId">Jugador existente (ID) o dejá vacío para crear nuevo</label>
-              <input id="pl-jugadorId" value={jugadorId} onChange={(e) => setJugadorId(e.target.value)} placeholder="uuid del jugador" />
+              <label htmlFor="pl-jugadorId">
+                Jugador existente (ID) o dejá vacío para crear nuevo
+              </label>
+              <input
+                id="pl-jugadorId"
+                value={jugadorId}
+                onChange={(e) => setJugadorId(e.target.value)}
+                placeholder="uuid del jugador"
+              />
             </div>
             <div className="campo">
               <label htmlFor="pl-nombre">Nombre</label>
-              <input id="pl-nombre" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)} />
+              <input
+                id="pl-nombre"
+                value={nombreNuevo}
+                onChange={(e) => setNombreNuevo(e.target.value)}
+              />
             </div>
             <div className="campo">
               <label htmlFor="pl-apellido">Apellido</label>
-              <input id="pl-apellido" value={apellidoNuevo} onChange={(e) => setApellidoNuevo(e.target.value)} />
+              <input
+                id="pl-apellido"
+                value={apellidoNuevo}
+                onChange={(e) => setApellidoNuevo(e.target.value)}
+              />
             </div>
             <div className="campo">
               <label htmlFor="pl-dni">DNI (opcional)</label>
@@ -239,7 +434,12 @@ function PlantelSection({
             </div>
             <div className="campo">
               <label htmlFor="pl-dorsal">Dorsal (opcional)</label>
-              <input id="pl-dorsal" value={dorsalNuevo} onChange={(e) => setDorsalNuevo(e.target.value)} type="number" />
+              <input
+                id="pl-dorsal"
+                value={dorsalNuevo}
+                onChange={(e) => setDorsalNuevo(e.target.value)}
+                type="number"
+              />
             </div>
             <button className="boton boton-primario" type="submit">
               Incorporar
@@ -250,6 +450,67 @@ function PlantelSection({
 
       <div className="tarjeta">
         <h3>Plantel actual</h3>
+        {jugadorEditando && (
+          <form
+            className="tarjeta"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void onAccion(
+                `/equipo-jugadores/${jugadorEditando.id}`,
+                'PATCH',
+                { dorsal: dorsalEdicion === '' ? null : Number(dorsalEdicion) },
+                'Dorsal actualizado',
+              ).then(() => setJugadorEditando(null))
+            }}
+          >
+            <h4>Editar {jugadorEditando.nombre}</h4>
+            <div className="campo">
+              <label htmlFor="plantel-dorsal-edicion">Dorsal</label>
+              <input
+                id="plantel-dorsal-edicion"
+                type="number"
+                value={dorsalEdicion}
+                onChange={(e) => setDorsalEdicion(e.target.value)}
+              />
+            </div>
+            <div className="campo">
+              <label htmlFor="plantel-estado-edicion">Estado</label>
+              <select
+                id="plantel-estado-edicion"
+                value={estadoEdicion}
+                onChange={(e) => setEstadoEdicion(e.target.value)}
+              >
+                {ESTADOS_JUGADOR.map((estado) => (
+                  <option key={estado} value={estado}>
+                    {estado}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="acciones">
+              <button className="boton boton-primario" type="submit">
+                Guardar dorsal
+              </button>
+              <button
+                className="boton"
+                type="button"
+                onClick={() =>
+                  void onAccion(
+                    `/equipo-jugadores/${jugadorEditando.id}/estado`,
+                    'POST',
+                    { estado: estadoEdicion },
+                    'Estado actualizado',
+                  ).then(() => setJugadorEditando(null))
+                }
+              >
+                Guardar estado
+              </button>
+              <button className="boton" type="button" onClick={() => setJugadorEditando(null)}>
+                Cancelar
+              </button>
+            </div>
+          </form>
+        )}
         <ul className="lista">
           {plantel.map((j) => (
             <li key={j.id}>
@@ -257,44 +518,57 @@ function PlantelSection({
                 {j.nombre}
               </Link>{' '}
               · dorsal {j.dorsal ?? '—'} · {j.posiciones ?? '—'} · <strong>{j.estado}</strong>
-              {j.estado === 'BAJA' && ` · baja ${j.fechaSalida ? new Date(j.fechaSalida).toLocaleDateString() : ''}`}
-              {gestiona && j.estado !== 'BAJA' && (
-                <>
-                  {' '}
-                  <button
-                    className="boton"
-                    onClick={() => {
-                      const dorsal = window.prompt('Dorsal', String(j.dorsal ?? ''))
-                      if (dorsal !== null) void onAccion(`/equipo-jugadores/${j.id}`, 'PATCH', { dorsal: dorsal === '' ? null : Number(dorsal) })
-                    }}
-                  >
-                    Dorsal
-                  </button>{' '}
-                  <button
-                    className="boton"
-                    onClick={() => {
-                      const estado = window.prompt(`Estado (${ESTADOS_JUGADOR.join('/')})`, j.estado)
-                      if (estado) void onAccion(`/equipo-jugadores/${j.id}/estado`, 'POST', { estado })
-                    }}
-                  >
-                    Estado
-                  </button>{' '}
-                  <button
-                    className="boton"
-                    onClick={() => {
-                      const motivo = window.prompt('Motivo de baja', '')
-                      if (motivo !== null) void onAccion(`/equipo-jugadores/${j.id}/baja`, 'POST', { motivo: motivo || undefined }, 'Baja registrada')
-                    }}
-                  >
-                    Baja
-                  </button>
-                </>
-              )}
+              {j.estado === 'BAJA' &&
+                ` · baja ${j.fechaSalida ? new Date(j.fechaSalida).toLocaleDateString() : ''}`}
+              <PermissionGate permitido={gestiona && j.estado !== 'BAJA'}>
+                {' '}
+                <button
+                  className="boton"
+                  onClick={() => {
+                    setJugadorEditando(j)
+                    setDorsalEdicion(j.dorsal?.toString() ?? '')
+                    setEstadoEdicion(j.estado)
+                  }}
+                >
+                  Dorsal
+                </button>{' '}
+                <button
+                  className="boton"
+                  onClick={() => {
+                    setJugadorEditando(j)
+                    setDorsalEdicion(j.dorsal?.toString() ?? '')
+                    setEstadoEdicion(j.estado)
+                  }}
+                >
+                  Estado
+                </button>{' '}
+                <button className="boton" onClick={() => setBajaPendiente(j)}>
+                  Baja
+                </button>
+              </PermissionGate>
             </li>
           ))}
           {plantel.length === 0 && <li>Sin jugadores.</li>}
         </ul>
       </div>
+      <ConfirmDialog
+        abierto={bajaPendiente !== null}
+        titulo="Dar de baja jugador"
+        detalle={`La baja de ${bajaPendiente?.nombre ?? 'este jugador'} conserva su historial.`}
+        confirmar="Dar de baja"
+        onCancelar={() => setBajaPendiente(null)}
+        onConfirmar={() => {
+          if (bajaPendiente) {
+            void onAccion(
+              `/equipo-jugadores/${bajaPendiente.id}/baja`,
+              'POST',
+              undefined,
+              'Baja registrada',
+            )
+            setBajaPendiente(null)
+          }
+        }}
+      />
     </>
   )
 }
@@ -310,10 +584,20 @@ function AdministradoresSection({
 }) {
   const [usuarioId, setUsuarioId] = useState('')
   const [rol, setRol] = useState('DELEGADO')
+  const [administradorEditando, setAdministradorEditando] = useState<AdministradorEquipo | null>(
+    null,
+  )
+  const [rolEdicion, setRolEdicion] = useState('DELEGADO')
+  const [bajaAdministrador, setBajaAdministrador] = useState<AdministradorEquipo | null>(null)
 
   async function agregar(e: FormEvent) {
     e.preventDefault()
-    await onAccion(`/equipos/${equipoId}/administradores`, 'POST', { usuarioId, rolEnEquipo: rol }, 'Administrador agregado')
+    await onAccion(
+      `/equipos/${equipoId}/administradores`,
+      'POST',
+      { usuarioId, rolEnEquipo: rol },
+      'Administrador agregado',
+    )
     setUsuarioId('')
   }
 
@@ -324,7 +608,12 @@ function AdministradoresSection({
         <form onSubmit={agregar}>
           <div className="campo">
             <label htmlFor="ad-usuario">ID de usuario</label>
-            <input id="ad-usuario" value={usuarioId} onChange={(e) => setUsuarioId(e.target.value)} required />
+            <input
+              id="ad-usuario"
+              value={usuarioId}
+              onChange={(e) => setUsuarioId(e.target.value)}
+              required
+            />
           </div>
           <div className="campo">
             <label htmlFor="ad-rol">Rol</label>
@@ -341,6 +630,35 @@ function AdministradoresSection({
       </div>
       <div className="tarjeta">
         <h3>Administradores</h3>
+        {administradorEditando && (
+          <form
+            className="acciones"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void onAccion(
+                `/equipos/${equipoId}/administradores/${administradorEditando.id}`,
+                'PATCH',
+                { rolEnEquipo: rolEdicion },
+                'Rol actualizado',
+              ).then(() => setAdministradorEditando(null))
+            }}
+          >
+            <label htmlFor="admin-rol-edicion">Rol de {administradorEditando.usuario.nombre}</label>
+            <select
+              id="admin-rol-edicion"
+              value={rolEdicion}
+              onChange={(e) => setRolEdicion(e.target.value)}
+            >
+              <option value="DELEGADO">DELEGADO</option>
+              <option value="TECNICO">TECNICO</option>
+              <option value="AUXILIAR">AUXILIAR</option>
+            </select>
+            <button className="boton boton-primario">Guardar rol</button>
+            <button className="boton" type="button" onClick={() => setAdministradorEditando(null)}>
+              Cancelar
+            </button>
+          </form>
+        )}
         <ul className="lista">
           {administradores.map((a) => (
             <li key={a.id}>
@@ -348,13 +666,13 @@ function AdministradoresSection({
               <button
                 className="boton"
                 onClick={() => {
-                  const nuevo = window.prompt('Nuevo rol (DELEGADO/TECNICO/AUXILIAR)', a.rolEnEquipo)
-                  if (nuevo) void onAccion(`/equipos/${equipoId}/administradores/${a.id}`, 'PATCH', { rolEnEquipo: nuevo })
+                  setAdministradorEditando(a)
+                  setRolEdicion(a.rolEnEquipo)
                 }}
               >
                 Cambiar rol
               </button>{' '}
-              <button className="boton" onClick={() => void onAccion(`/equipos/${equipoId}/administradores/${a.id}/baja`, 'POST', undefined, 'Administrador dado de baja')}>
+              <button className="boton" onClick={() => setBajaAdministrador(a)}>
                 Dar de baja
               </button>
             </li>
@@ -362,6 +680,24 @@ function AdministradoresSection({
           {administradores.length === 0 && <li>Sin administradores.</li>}
         </ul>
       </div>
+      <ConfirmDialog
+        abierto={bajaAdministrador !== null}
+        titulo="Dar de baja administrador"
+        detalle={`Se revocará acceso de ${bajaAdministrador?.usuario.nombre ?? 'este administrador'} al equipo.`}
+        confirmar="Dar de baja"
+        onCancelar={() => setBajaAdministrador(null)}
+        onConfirmar={() => {
+          if (bajaAdministrador) {
+            void onAccion(
+              `/equipos/${equipoId}/administradores/${bajaAdministrador.id}/baja`,
+              'POST',
+              undefined,
+              'Administrador dado de baja',
+            )
+            setBajaAdministrador(null)
+          }
+        }}
+      />
     </>
   )
 }
@@ -412,15 +748,26 @@ function ConfigSection({
   return (
     <div className="tarjeta">
       <h3>Configuración del equipo</h3>
-      <p className="mensaje">La información de contacto es privada y solo la ven los miembros del equipo.</p>
+      <p className="mensaje">
+        La información de contacto es privada y solo la ven los miembros del equipo.
+      </p>
       <form onSubmit={guardar}>
         <div className="campo">
           <label htmlFor="cf-nombre">Nombre</label>
-          <input id="cf-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+          <input
+            id="cf-nombre"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            required
+          />
         </div>
         <div className="campo">
           <label htmlFor="cf-desc">Descripción</label>
-          <input id="cf-desc" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+          <input
+            id="cf-desc"
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+          />
         </div>
         <div className="campo">
           <label htmlFor="cf-escudo">Escudo URL</label>
@@ -440,7 +787,12 @@ function ConfigSection({
         </div>
         <div className="campo">
           <label>
-            <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} /> Equipo privado
+            <input
+              type="checkbox"
+              checked={privado}
+              onChange={(e) => setPrivado(e.target.checked)}
+            />{' '}
+            Equipo privado
           </label>
         </div>
         <button className="boton boton-primario" type="submit">
@@ -487,7 +839,8 @@ function InvitacionesSection({
         if (activo) setInvitaciones(data)
       })
       .catch((err) => {
-        if (activo) setError(err instanceof Error ? err.message : 'No se pudieron cargar las invitaciones')
+        if (activo)
+          setError(err instanceof Error ? err.message : 'No se pudieron cargar las invitaciones')
       })
       .finally(() => {
         if (activo) setCargando(false)
@@ -507,7 +860,14 @@ function InvitacionesSection({
         body: JSON.stringify(
           jugadorId
             ? { jugadorId, mensaje: mensajeInv || undefined }
-            : { persona: { nombre: personaNombre, apellido: personaApellido, dni: personaDni || undefined }, mensaje: mensajeInv || undefined },
+            : {
+                persona: {
+                  nombre: personaNombre,
+                  apellido: personaApellido,
+                  dni: personaDni || undefined,
+                },
+                mensaje: mensajeInv || undefined,
+              },
         ),
       })
       setMensaje('Invitación enviada')
@@ -529,7 +889,11 @@ function InvitacionesSection({
     try {
       const res = await apiFetch<{ existe: boolean }>(`/equipos/${equipoId}/invitaciones-cuerpo`, {
         method: 'POST',
-        body: JSON.stringify({ email: emailCuerpo, rolEnEquipo: rolCuerpo, mensaje: mensajeCuerpo || undefined }),
+        body: JSON.stringify({
+          email: emailCuerpo,
+          rolEnEquipo: rolCuerpo,
+          mensaje: mensajeCuerpo || undefined,
+        }),
       })
       setMensaje(res.existe ? 'Invitación enviada' : 'No existe una cuenta con ese email')
       setEmailCuerpo('')
@@ -561,24 +925,47 @@ function InvitacionesSection({
               <h3>Invitar jugador</h3>
               <form onSubmit={invitarJugador}>
                 <div className="campo">
-                  <label htmlFor="ij-id">Jugador existente (ID) o vacío para crear persona nueva</label>
-                  <input id="ij-id" value={jugadorId} onChange={(e) => setJugadorId(e.target.value)} placeholder="uuid del jugador" />
+                  <label htmlFor="ij-id">
+                    Jugador existente (ID) o vacío para crear persona nueva
+                  </label>
+                  <input
+                    id="ij-id"
+                    value={jugadorId}
+                    onChange={(e) => setJugadorId(e.target.value)}
+                    placeholder="uuid del jugador"
+                  />
                 </div>
                 <div className="campo">
                   <label htmlFor="ij-nombre">Nombre (persona nueva)</label>
-                  <input id="ij-nombre" value={personaNombre} onChange={(e) => setPersonaNombre(e.target.value)} />
+                  <input
+                    id="ij-nombre"
+                    value={personaNombre}
+                    onChange={(e) => setPersonaNombre(e.target.value)}
+                  />
                 </div>
                 <div className="campo">
                   <label htmlFor="ij-apellido">Apellido (persona nueva)</label>
-                  <input id="ij-apellido" value={personaApellido} onChange={(e) => setPersonaApellido(e.target.value)} />
+                  <input
+                    id="ij-apellido"
+                    value={personaApellido}
+                    onChange={(e) => setPersonaApellido(e.target.value)}
+                  />
                 </div>
                 <div className="campo">
                   <label htmlFor="ij-dni">DNI (opcional)</label>
-                  <input id="ij-dni" value={personaDni} onChange={(e) => setPersonaDni(e.target.value)} />
+                  <input
+                    id="ij-dni"
+                    value={personaDni}
+                    onChange={(e) => setPersonaDni(e.target.value)}
+                  />
                 </div>
                 <div className="campo">
                   <label htmlFor="ij-mensaje">Mensaje (opcional)</label>
-                  <input id="ij-mensaje" value={mensajeInv} onChange={(e) => setMensajeInv(e.target.value)} />
+                  <input
+                    id="ij-mensaje"
+                    value={mensajeInv}
+                    onChange={(e) => setMensajeInv(e.target.value)}
+                  />
                 </div>
                 <button className="boton boton-primario" type="submit">
                   Invitar jugador
@@ -592,11 +979,21 @@ function InvitacionesSection({
               <form onSubmit={invitarCuerpo}>
                 <div className="campo">
                   <label htmlFor="ic-email">Email</label>
-                  <input id="ic-email" type="email" value={emailCuerpo} onChange={(e) => setEmailCuerpo(e.target.value)} required />
+                  <input
+                    id="ic-email"
+                    type="email"
+                    value={emailCuerpo}
+                    onChange={(e) => setEmailCuerpo(e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="campo">
                   <label htmlFor="ic-rol">Rol</label>
-                  <select id="ic-rol" value={rolCuerpo} onChange={(e) => setRolCuerpo(e.target.value)}>
+                  <select
+                    id="ic-rol"
+                    value={rolCuerpo}
+                    onChange={(e) => setRolCuerpo(e.target.value)}
+                  >
                     <option value="DELEGADO">DELEGADO</option>
                     <option value="TECNICO">TECNICO</option>
                     <option value="AUXILIAR">AUXILIAR</option>
@@ -604,7 +1001,11 @@ function InvitacionesSection({
                 </div>
                 <div className="campo">
                   <label htmlFor="ic-mensaje">Mensaje (opcional)</label>
-                  <input id="ic-mensaje" value={mensajeCuerpo} onChange={(e) => setMensajeCuerpo(e.target.value)} />
+                  <input
+                    id="ic-mensaje"
+                    value={mensajeCuerpo}
+                    onChange={(e) => setMensajeCuerpo(e.target.value)}
+                  />
                 </div>
                 <button className="boton boton-primario" type="submit">
                   Invitar
@@ -625,10 +1026,13 @@ function InvitacionesSection({
           <ul className="lista">
             {invitaciones.map((inv) => (
               <li key={inv.id}>
-                {inv.destinatario ? `${inv.destinatario.nombre ?? ''} ${inv.destinatario.apellido ?? ''}`.trim() : '—'} ·{' '}
-                {inv.tipo === 'JUGADOR' ? 'jugador' : `cuerpo técnico (${inv.rolEnEquipo ?? '—'})`} ·{' '}
-                <span className="estado">{inv.estado}</span>
-                {' '}· {new Date(inv.createdAt).toLocaleDateString()}
+                {inv.destinatario
+                  ? `${inv.destinatario.nombre ?? ''} ${inv.destinatario.apellido ?? ''}`.trim()
+                  : '—'}{' '}
+                ·{' '}
+                {inv.tipo === 'JUGADOR' ? 'jugador' : `cuerpo técnico (${inv.rolEnEquipo ?? '—'})`}{' '}
+                · <span className="estado">{inv.estado}</span> ·{' '}
+                {new Date(inv.createdAt).toLocaleDateString()}
                 {inv.estado === 'PENDIENTE' && (
                   <>
                     {' '}

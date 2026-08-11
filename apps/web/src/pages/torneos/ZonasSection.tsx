@@ -14,6 +14,8 @@ export default function ZonasSection({ competicionId, zonas, participaciones, on
   const [nombre, setNombre] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [mensaje, setMensaje] = useState<string | null>(null)
+  const [zonaEditando, setZonaEditando] = useState<Zona | null>(null)
+  const [nombreEdicion, setNombreEdicion] = useState('')
 
   async function crear(e: FormEvent) {
     e.preventDefault()
@@ -33,12 +35,17 @@ export default function ZonasSection({ competicionId, zonas, participaciones, on
     }
   }
 
-  async function renombrar(zona: Zona) {
-    const nuevo = window.prompt('Nuevo nombre', zona.nombre)
-    if (nuevo === null) return
+  async function renombrar(e: FormEvent) {
+    e.preventDefault()
+    if (!zonaEditando) return
     try {
-      await apiFetch(`/zonas/${zona.id}`, { method: 'PATCH', body: JSON.stringify({ nombre: nuevo }) })
+      await apiFetch(`/zonas/${zonaEditando.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ nombre: nombreEdicion }),
+      })
       await onRecargar()
+      setZonaEditando(null)
+      setMensaje('Zona actualizada')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo renombrar la zona')
     }
@@ -62,7 +69,9 @@ export default function ZonasSection({ competicionId, zonas, participaciones, on
   }
 
   const participantesDeZona = participaciones.filter(
-    (p) => p.torneoCategoriaId === competicionId && (p.estado === 'CONFIRMADO' || p.estado === 'INSCRIPTO'),
+    (p) =>
+      p.torneoCategoriaId === competicionId &&
+      (p.estado === 'CONFIRMADO' || p.estado === 'INSCRIPTO'),
   )
 
   return (
@@ -74,7 +83,13 @@ export default function ZonasSection({ competicionId, zonas, participaciones, on
         <form onSubmit={crear}>
           <div className="campo">
             <label htmlFor="zona-nombre">Nombre</label>
-            <input id="zona-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Zona A" required />
+            <input
+              id="zona-nombre"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Zona A"
+              required
+            />
           </div>
           <button className="boton boton-primario" type="submit">
             Crear
@@ -83,12 +98,35 @@ export default function ZonasSection({ competicionId, zonas, participaciones, on
       </div>
       <div className="tarjeta">
         <h3>Zonas</h3>
+        {zonaEditando && (
+          <form className="acciones" onSubmit={renombrar}>
+            <label htmlFor="zona-edicion">Nuevo nombre</label>
+            <input
+              id="zona-edicion"
+              value={nombreEdicion}
+              onChange={(e) => setNombreEdicion(e.target.value)}
+              required
+            />
+            <button className="boton boton-primario" type="submit">
+              Guardar
+            </button>
+            <button className="boton" type="button" onClick={() => setZonaEditando(null)}>
+              Cancelar
+            </button>
+          </form>
+        )}
         {zonas.length === 0 && <p>Sin zonas. Podés usar una zona única o crear varias.</p>}
         <ul className="lista">
           {zonas.map((z) => (
             <li key={z.id}>
               {z.nombre} ({z._count?.participaciones ?? 0} equipos){' '}
-              <button className="boton" onClick={() => void renombrar(z)}>
+              <button
+                className="boton"
+                onClick={() => {
+                  setZonaEditando(z)
+                  setNombreEdicion(z.nombre)
+                }}
+              >
                 Renombrar
               </button>
             </li>
@@ -101,7 +139,10 @@ export default function ZonasSection({ competicionId, zonas, participaciones, on
           {participantesDeZona.map((p) => (
             <li key={p.id}>
               {p.equipo.nombre} · zona actual: {p.zona?.nombre ?? '—'} ·{' '}
-              <select value={p.zonaId ?? ''} onChange={(e) => void asignarZona(p.id, e.target.value || null)}>
+              <select
+                value={p.zonaId ?? ''}
+                onChange={(e) => void asignarZona(p.id, e.target.value || null)}
+              >
                 <option value="">Sin zona</option>
                 {zonas.map((z) => (
                   <option key={z.id} value={z.id}>
