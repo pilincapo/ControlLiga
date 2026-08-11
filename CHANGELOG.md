@@ -2,6 +2,19 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [0.8.0] - 2026-08-11
+
+### Agregado
+
+- **FASE 8 — Fixture y tabla** (diseño aprobado en `docs/fase-8-diseno.md`).
+- Fixture round-robin `TODOS_CONTRA_TODOS`, `UNA_RUEDA` y `DOS_RUEDAS`, con jornadas, descansos, localías balanceadas y regeneración explícita segura.
+- Tabla calculada desde partidos oficiales finalizados, puntos configurables, desempate H2H múltiple y metadata de criterios no disponibles.
+- Endpoints protegidos de fixture, jornadas y tabla, endpoints públicos filtrados por configuración y `Partido.publicada`.
+- Auditoría de generación, validación, regeneración, rechazo de regeneración y edición de jornadas.
+- Frontend básico para consultar/generar fixture y tabla desde detalle de torneo.
+- No se agregan modelos ni migraciones Prisma.
+- Tests HTTP/integración de permisos, confirmación, regeneración segura, auditoría y publicación pública del fixture.
+
 ## [0.7.0] - 2026-08-10
 
 ### Agregado

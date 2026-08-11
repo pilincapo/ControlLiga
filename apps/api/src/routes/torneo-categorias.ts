@@ -202,13 +202,20 @@ export async function torneoCategoriasRoutes(app: FastifyInstance): Promise<void
       const prisma = getPrisma()
       const tc = await prisma.torneoCategoria.findUnique({
         where: { id },
-        select: { id: true, temporada: { select: { torneoId: true } }, configuracion: true },
+        select: { id: true, temporada: { select: { torneoId: true, estado: true } }, configuracion: true },
       })
       if (!tc) {
         throw noEncontrado('Competición')
       }
       if (!(await esAdminDeTorneo(prisma, auth, tc.temporada.torneoId))) {
         throw prohibido('No tenés permiso para administrar esa competición')
+      }
+      if (tc.temporada.estado === 'EN_CURSO') {
+        throw conflicto('configuracion_bloqueada', 'Puntos y desempates quedan bloqueados al iniciar la temporada')
+      }
+      const finalizados = await prisma.partido.count({ where: { torneoCategoriaId: id, tipo: 'OFICIAL', estado: 'FINALIZADO' } })
+      if (finalizados > 0) {
+        throw conflicto('configuracion_bloqueada', 'No se puede cambiar configuración después de resultados finalizados')
       }
       if (
         body.formato === undefined &&

@@ -11,10 +11,11 @@ import ZonasSection from './ZonasSection'
 import EquiposSection from './EquiposSection'
 import JugadoresSection from './JugadoresSection'
 import ConfigPublicaSection from './ConfigPublicaSection'
+import FixtureTablaSection from './FixtureTablaSection'
 import { TRANSICIONES_TORNEO } from './tipos'
 import type { CategoriaGlobal, TemporadaDetalle, Torneo } from './tipos'
 
-const TABS = ['resumen', 'config', 'temporadas', 'categorias', 'zonas', 'equipos', 'jugadores', 'publico'] as const
+const TABS = ['resumen', 'config', 'temporadas', 'categorias', 'zonas', 'fixture', 'equipos', 'jugadores', 'publico'] as const
 type Tab = (typeof TABS)[number]
 
 export default function TorneoDetailPage() {
@@ -224,6 +225,8 @@ export default function TorneoDetailPage() {
           onRecargar={recargar}
         />
       )}
+
+      {tab === 'fixture' && <FixtureTablaSection competenciaId={competicionId} zonaId={zonasDeCompeticion[0]?.id} />}
 
       {tab === 'equipos' && (
         <EquiposSection
