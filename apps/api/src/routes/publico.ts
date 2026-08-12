@@ -132,6 +132,21 @@ export async function publicoRoutes(app: FastifyInstance): Promise<void> {
     return { data: await getPrisma().zona.findMany({ where: { torneoCategoriaId: id, torneoCategoria: { torneo: { visiblePublico: true } } }, select: { id: true, nombre: true }, orderBy: { createdAt: 'asc' } }) }
   })
 
+  app.get('/publico/torneo-categorias/:id/fases', async (request) => {
+    const { id } = request.params as { id: string }
+    const tc = await competenciaPublica(id)
+    const c = config<ConfigPublica>(tc.torneo.configuracionPublica)
+    if (c.mostrarFixture !== true) throw noEncontrado('Fases')
+    const fases = await getPrisma().faseCompetencia.findMany({
+      where: { torneoCategoriaId: id },
+      include: {
+        grupos: { include: { participaciones: { where: { equipo: { privado: false } }, include: { equipo: { select: { id: true, nombre: true, escudoUrl: true } } } } }, orderBy: { orden: 'asc' } },
+        rondas: { include: { llaves: { include: { participacionLocal: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true, privado: true } } } }, participacionVisitante: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true, privado: true } } } }, ganadorParticipacion: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true, privado: true } } } }, partidos: { where: { publicada: true }, select: { id: true, fechaHora: true, estado: true, golesLocal: true, golesVisitante: true } } }, orderBy: { orden: 'asc' } } }, orderBy: { orden: 'asc' } },
+      }, orderBy: { orden: 'asc' },
+    })
+    return { data: fases.map((fase) => ({ ...fase, rondas: fase.rondas.map((ronda) => ({ ...ronda, llaves: ronda.llaves.filter((llave) => !llave.participacionLocal?.equipo.privado && !llave.participacionVisitante?.equipo.privado && !llave.ganadorParticipacion?.equipo.privado) })) })) }
+  })
+
   app.get('/publico/torneo-categorias/:id/estadisticas', async (request) => {
     const { id } = request.params as { id: string }
     const tc = await competenciaPublica(id)

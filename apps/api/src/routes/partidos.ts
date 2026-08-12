@@ -12,6 +12,7 @@ import type { PrismaClient } from '../generated/prisma/client.js'
 import type { EstadoPartido } from '../generated/prisma/enums.js'
 import { validarGoles } from './eventos-partido.js'
 import { notificarMiembrosEquipos } from '../notificaciones/servicio.js'
+import { actualizarLlavePorPartidoFinalizado } from '../competencia-avanzada/servicio.js'
 
 interface CrearPartidoBody {
   tipo: string
@@ -237,6 +238,7 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
     }
     if (body.estado === 'FINALIZADO' && !(await validarGoles(prisma, p.id, p.golesLocal, p.golesVisitante))) throw badRequest('Los goles oficiales no coinciden con eventos GOL no anulados')
     const actualizado = await prisma.partido.update({ where: { id }, data: { estado: body.estado as EstadoPartido }, select: { id: true, estado: true } })
+    if (actualizado.estado === 'FINALIZADO') await actualizarLlavePorPartidoFinalizado(prisma, id)
     await auditar(prisma, { entidad: 'Partido', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { cambioDeEstado: { de: p.estado, a: body.estado } } })
     return { data: actualizado }
   })
@@ -260,6 +262,7 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
       data.estado = nuevoEstado
     }
     const actualizado = await prisma.partido.update({ where: { id }, data, select: { id: true, golesLocal: true, golesVisitante: true, estado: true } })
+    if (actualizado.estado === 'FINALIZADO') await actualizarLlavePorPartidoFinalizado(prisma, id)
     await auditar(prisma, { entidad: 'Partido', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { resultado: { golesLocal: body.golesLocal, golesVisitante: body.golesVisitante }, ...(nuevoEstado ? { finalizado: true } : {}) } })
     return { data: actualizado }
   })

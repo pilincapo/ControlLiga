@@ -32,7 +32,8 @@ function App() {
           <Route path="/publico/torneos" element={<PublicPortalPage />} />
           <Route path="/publico/torneos/:id" element={<PublicPortalPage />} />
           <Route path="/publico/torneos/:torneoId/temporadas/:id" element={<PublicResourcePage />} />
-          <Route path="/publico/competencias/:id" element={<PublicResourcePage />} />
+            <Route path="/publico/competencias/:id" element={<PublicResourcePage />} />
+            <Route path="/publico/competencias/:id/fases" element={<PublicResourcePage />} />
           <Route path="/publico/partidos/:id" element={<PublicResourcePage />} />
           <Route path="/publico/equipos/:id" element={<PublicResourcePage />} />
           <Route path="/" element={<PublicPortalPage />} />

@@ -49,6 +49,43 @@ enum FormatoCompetencia {
   FASE_REGULAR_PLAYOFFS
 }
 
+enum TipoFaseCompetencia {
+  GRUPOS
+  ELIMINACION_DIRECTA
+  LIGA
+}
+
+enum EstadoFaseCompetencia {
+  BORRADOR
+  GENERADA
+  EN_CURSO
+  FINALIZADA
+  BLOQUEADA
+}
+
+enum EstadoLlaveCompetencia {
+  PENDIENTE_PARTICIPANTES
+  PROGRAMADA
+  EN_CURSO
+  PENDIENTE_DEFINICION
+  RESUELTA
+  BYE
+  BLOQUEADA
+}
+
+enum TipoOrigenLlave {
+  SEED
+  GANADOR_LLAVE
+  PERDEDOR_LLAVE
+  ASIGNACION_ADMINISTRATIVA
+}
+
+enum MetodoResolucionLlave {
+  RESULTADO_PARTIDO
+  BYE
+  ADMINISTRATIVA
+}
+
 enum EstadoJornada {
   PENDIENTE
   EN_CURSO
@@ -467,6 +504,7 @@ model TorneoCategoria {
   sanciones       Sancion[]
   jornadas        Jornada[]
   configuracion   ConfiguracionCompetencia?
+  fasesCompetencia FaseCompetencia[]
   createdAt       DateTime              @default(now())
 
   @@unique([torneoId, temporadaId, categoriaId])
@@ -506,7 +544,12 @@ model EquipoParticipacion {
   fechaBaja         DateTime?
   invitadoPorId     String?             @db.Uuid
   invitadoPor       Usuario?            @relation("EquipoParticipacionInvitador", fields: [invitadoPorId], references: [id])
+  grupoCompetenciaId String?             @db.Uuid
+  grupoCompetencia   GrupoCompetencia?   @relation(fields: [grupoCompetenciaId], references: [id], onDelete: Restrict)
   jugadores         JugadorParticipacion[]
+  llavesLocal       LlaveCompetencia[]   @relation("LlaveLocal")
+  llavesVisitante   LlaveCompetencia[]   @relation("LlaveVisitante")
+  llavesGanadas     LlaveCompetencia[]   @relation("LlaveGanador")
   createdAt         DateTime            @default(now())
 
   @@index([equipoId, torneoId, temporadaId])
@@ -514,6 +557,7 @@ model EquipoParticipacion {
   @@index([temporadaId])
   @@index([torneoCategoriaId])
   @@index([zonaId])
+  @@index([grupoCompetenciaId])
   @@map("equipo_participacion")
 }
 
@@ -547,12 +591,106 @@ model ConfiguracionCompetencia {
   @@map("configuracion_competencia")
 }
 
+model FaseCompetencia {
+  id                String                @id @default(uuid()) @db.Uuid
+  torneoCategoriaId String                @db.Uuid
+  torneoCategoria   TorneoCategoria       @relation(fields: [torneoCategoriaId], references: [id], onDelete: Restrict)
+  orden             Int
+  nombre            String
+  tipo              TipoFaseCompetencia
+  estado            EstadoFaseCompetencia @default(BORRADOR)
+  configuracion     Json
+  sistemaPuntos     Json?
+  desempates        Json?
+  grupos            GrupoCompetencia[]
+  rondas            RondaEliminatoria[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([torneoCategoriaId, orden])
+  @@index([torneoCategoriaId, estado])
+  @@map("fases_competencia")
+}
+
+model GrupoCompetencia {
+  id                String               @id @default(uuid()) @db.Uuid
+  faseCompetenciaId String               @db.Uuid
+  faseCompetencia   FaseCompetencia      @relation(fields: [faseCompetenciaId], references: [id], onDelete: Restrict)
+  orden             Int
+  nombre            String
+  participaciones   EquipoParticipacion[]
+  jornadas          Jornada[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@unique([faseCompetenciaId, orden])
+  @@unique([faseCompetenciaId, nombre])
+  @@index([faseCompetenciaId])
+  @@map("grupos_competencia")
+}
+
+model RondaEliminatoria {
+  id                String              @id @default(uuid()) @db.Uuid
+  faseCompetenciaId String              @db.Uuid
+  faseCompetencia   FaseCompetencia     @relation(fields: [faseCompetenciaId], references: [id], onDelete: Restrict)
+  orden             Int
+  nombre            String
+  llaves            LlaveCompetencia[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([faseCompetenciaId, orden])
+  @@index([faseCompetenciaId])
+  @@map("rondas_eliminatorias")
+}
+
+model LlaveCompetencia {
+  id                       String                 @id @default(uuid()) @db.Uuid
+  rondaEliminatoriaId      String                 @db.Uuid
+  rondaEliminatoria        RondaEliminatoria      @relation(fields: [rondaEliminatoriaId], references: [id], onDelete: Restrict)
+  orden                    Int
+  participacionLocalId     String?                @db.Uuid
+  participacionLocal       EquipoParticipacion?   @relation("LlaveLocal", fields: [participacionLocalId], references: [id], onDelete: Restrict)
+  participacionVisitanteId String?                @db.Uuid
+  participacionVisitante   EquipoParticipacion?   @relation("LlaveVisitante", fields: [participacionVisitanteId], references: [id], onDelete: Restrict)
+  seedLocal                Int?
+  seedVisitante            Int?
+  origenLocalTipo          TipoOrigenLlave?
+  origenLocalLlaveId       String?                @db.Uuid
+  origenLocalLlave         LlaveCompetencia?      @relation("OrigenLocal", fields: [origenLocalLlaveId], references: [id], onDelete: Restrict)
+  origenVisitanteTipo      TipoOrigenLlave?
+  origenVisitanteLlaveId   String?                @db.Uuid
+  origenVisitanteLlave     LlaveCompetencia?      @relation("OrigenVisitante", fields: [origenVisitanteLlaveId], references: [id], onDelete: Restrict)
+  llaveSiguienteId         String?                @db.Uuid
+  llaveSiguiente           LlaveCompetencia?      @relation("LlaveSiguiente", fields: [llaveSiguienteId], references: [id], onDelete: Restrict)
+  ladoSiguiente            String?
+  ganadorParticipacionId   String?                @db.Uuid
+  ganadorParticipacion     EquipoParticipacion?   @relation("LlaveGanador", fields: [ganadorParticipacionId], references: [id], onDelete: Restrict)
+  estado                   EstadoLlaveCompetencia @default(PENDIENTE_PARTICIPANTES)
+  metodoResolucion         MetodoResolucionLlave?
+  partidos                 Partido[]
+  origenLocalDe            LlaveCompetencia[]     @relation("OrigenLocal")
+  origenVisitanteDe        LlaveCompetencia[]     @relation("OrigenVisitante")
+  anteriores               LlaveCompetencia[]     @relation("LlaveSiguiente")
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+
+  @@unique([rondaEliminatoriaId, orden])
+  @@index([rondaEliminatoriaId, estado])
+  @@index([llaveSiguienteId])
+  @@index([participacionLocalId])
+  @@index([participacionVisitanteId])
+  @@map("llaves_competencia")
+}
+
 model Jornada {
   id                String                   @id @default(uuid()) @db.Uuid
   torneoCategoriaId String                   @db.Uuid
   torneoCategoria   TorneoCategoria          @relation(fields: [torneoCategoriaId], references: [id])
   zonaId            String?                  @db.Uuid
   zona              Zona?                    @relation(fields: [zonaId], references: [id])
+  grupoCompetenciaId String?                  @db.Uuid
+  grupoCompetencia   GrupoCompetencia?        @relation(fields: [grupoCompetenciaId], references: [id], onDelete: Restrict)
   numero            Int
   nombre            String?
   fechaInicio       DateTime?
@@ -563,6 +701,7 @@ model Jornada {
   updatedAt         DateTime                 @updatedAt
 
   @@index([torneoCategoriaId])
+  @@index([grupoCompetenciaId])
   @@map("jornadas")
 }
 
@@ -599,6 +738,8 @@ model Partido {
   equipoVisitante     Equipo?          @relation("PartidoEquipoVisitante", fields: [equipoVisitanteId], references: [id])
   jornadaId           String?          @db.Uuid
   jornada             Jornada?         @relation(fields: [jornadaId], references: [id])
+  llaveCompetenciaId  String?          @db.Uuid
+  llaveCompetencia    LlaveCompetencia? @relation(fields: [llaveCompetenciaId], references: [id], onDelete: Restrict)
   fechaHora           DateTime
   lugar               String?
   estado              EstadoPartido    @default(PROGRAMADO)
@@ -622,6 +763,7 @@ model Partido {
   @@index([fechaHora])
   @@index([jornadaId])
   @@index([equipoResponsableId, tipo])
+  @@index([llaveCompetenciaId])
   @@map("partidos")
 }
 

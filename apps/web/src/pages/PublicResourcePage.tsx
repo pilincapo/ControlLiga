@@ -58,7 +58,9 @@ export default function PublicResourcePage() {
   const [error, setError] = useState<string | null>(null)
   const ruta = location.pathname.includes('/temporadas/')
     ? `/publico/temporadas/${params.id}/categorias`
-    : location.pathname.includes('/competencias/')
+    : location.pathname.endsWith('/fases')
+      ? `/publico/torneo-categorias/${params.id}/fases`
+      : location.pathname.includes('/competencias/')
       ? `/publico/torneo-categorias/${params.id}/zonas`
       : location.pathname.includes('/partidos/')
         ? `/publico/partidos/${params.id}`
@@ -97,7 +99,9 @@ export default function PublicResourcePage() {
         <h2>
           {location.pathname.includes('/partidos/')
             ? 'Partido'
-            : location.pathname.includes('/equipos/')
+            : location.pathname.endsWith('/fases')
+              ? 'Fases de competencia'
+              : location.pathname.includes('/equipos/')
               ? 'Equipo'
               : 'Competencia'}
         </h2>

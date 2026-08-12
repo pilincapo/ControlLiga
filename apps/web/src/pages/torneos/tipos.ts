@@ -70,6 +70,31 @@ export interface Participacion {
   zona: { id: string; nombre: string } | null
 }
 
+export interface FaseCompetencia {
+  id: string
+  orden: number
+  nombre: string
+  tipo: 'GRUPOS' | 'ELIMINACION_DIRECTA'
+  estado: string
+  grupos: Array<{
+    id: string
+    nombre: string
+    participaciones: Array<{ id: string; equipo: { id: string; nombre: string } }>
+  }>
+  rondas: Array<{
+    id: string
+    nombre: string
+    llaves: Array<{
+      id: string
+      orden: number
+      estado: string
+      participacionLocal: { equipo: { nombre: string } } | null
+      participacionVisitante: { equipo: { nombre: string } } | null
+      ganadorParticipacion: { equipo: { nombre: string } } | null
+    }>
+  }>
+}
+
 export interface TemporadaDetalle {
   id: string
   nombre: string

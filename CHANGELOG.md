@@ -2,6 +2,18 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Unreleased]
+
+### Agregado
+
+- FASE 16A backend: fases de grupos y eliminación directa con seeds manuales, BYE, llaves estructurales, avance seguro, tablas con snapshots y regeneración bloqueada ante actividad.
+- FASE 16A web: administración privada de fases de grupos y eliminación directa desde participaciones confirmadas, con confirmación de generación/regeneración y visualización de grupos, rondas y llaves.
+- Portal público FASE 16A para fases, grupos, rondas y llaves, sujeto a `mostrarFixture` y sin exponer equipos privados.
+
+### Documentación
+
+- Diseño propuesto de FASE 16 para competencia avanzada, con recomendación de dividir grupos/eliminación, clasificación y series ida/vuelta en entregas compatibles con historial.
+
 ## [0.15.0] - 2026-08-11
 
 ### Cambiado
