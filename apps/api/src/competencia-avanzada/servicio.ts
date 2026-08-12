@@ -6,7 +6,8 @@ import { badRequest, conflicto } from '../http.js'
 type Db = PrismaClient | Parameters<Parameters<PrismaClient['$transaction']>[0]>[0]
 type GrupoEntrada = { nombre: string; participacionIds: string[] }
 type SeedEntrada = { participacionId: string; seed: number }
-type FaseGenerable = { id: string; torneoCategoriaId: string; configuracion: unknown; grupos: Array<{ id: string; nombre: string; participaciones: Array<{ equipoId: string }> }>; torneoCategoria: { torneoId: string; temporadaId: string } }
+type ReglaEntrada = { faseDestinoId: string; orden: number; tipo: 'POSICION_GRUPO' | 'MEJORES_ENTRE_GRUPOS' | 'POSICION_GENERAL'; posicionDesde: number; posicionHasta: number; cantidad?: number; grupoCompetenciaId?: string; seedTipo: 'ORDEN_CLASIFICACION' | 'CRUCE_EXPLICITO'; seedInicio: number; configuracion?: Record<string, unknown> }
+type FaseGenerable = { id: string; torneoCategoriaId: string; configuracion: unknown; grupos: Array<{ id: string; nombre: string; participaciones: Array<{ equipoId: string }> }>; participantesFase: Array<{ id: string; participacionId: string; seed: number | null; participacion: { equipoId: string } }>; torneoCategoria: { torneoId: string; temporadaId: string } }
 type LlaveCarga = { id: string; estado: string; ganadorParticipacionId: string | null; llaveSiguienteId: string | null; ladoSiguiente: string | null; participacionLocalId: string | null; participacionVisitanteId: string | null; partidos: Array<{ id: string }>; rondaEliminatoria: { faseCompetencia: { torneoCategoriaId: string; torneoCategoria: { torneoId: string; temporadaId: string } } } }
 
 function siguientePotenciaDos(cantidad: number) {
@@ -60,13 +61,34 @@ export async function crearFaseEliminacion(db: PrismaClient, datos: { torneoCate
 }
 
 export async function generarFase(db: PrismaClient, faseId: string, usuarioId: string) {
-  const fase = await db.faseCompetencia.findUnique({ where: { id: faseId }, include: { torneoCategoria: { include: { temporada: true } }, grupos: { include: { participaciones: { include: { equipo: true } } } }, rondas: true } })
+  const fase = await db.faseCompetencia.findUnique({ where: { id: faseId }, include: { torneoCategoria: { include: { temporada: true } }, grupos: { include: { participaciones: { include: { equipo: true } } } }, participantesFase: { include: { participacion: true }, orderBy: { seed: 'asc' } }, rondas: true } })
   if (!fase) throw badRequest('La fase no existe')
   if (fase.estado !== 'BORRADOR' || fase.rondas.length) throw conflicto('fase_existente', 'La fase ya fue generada')
   if (!['BORRADOR', 'PUBLICADO'].includes(fase.torneoCategoria.temporada.estado)) throw conflicto('temporada_no_generable', 'La fase no puede generarse en esta temporada')
   if (fase.tipo === 'GRUPOS') return generarGrupos(db, fase as unknown as FaseGenerable, usuarioId)
   if (fase.tipo === 'ELIMINACION_DIRECTA') return generarEliminacion(db, fase as unknown as FaseGenerable, usuarioId)
-  throw badRequest('Tipo de fase fuera de alcance FASE 16A')
+  if (fase.tipo === 'LIGA') return generarLiga(db, fase as unknown as FaseGenerable, usuarioId)
+  throw badRequest('Tipo de fase inválido')
+}
+
+async function generarLiga(db: PrismaClient, fase: FaseGenerable, usuarioId: string) {
+  const participantes = await db.participanteFase.findMany({ where: { faseCompetenciaId: fase.id }, include: { participacion: true }, orderBy: { seed: 'asc' } })
+  const ruedas = (fase.configuracion as { ruedas?: number }).ruedas
+  if (![1, 2].includes(ruedas ?? 0) || participantes.length < 2) throw badRequest('Liga requiere participantes y ruedas válidas')
+  return db.$transaction(async (tx) => {
+    let cantidadPartidos = 0
+    for (const [indice, ronda] of calcularRondas(participantes.map((p) => p.participacion.equipoId), ruedas!).entries()) {
+        const jornada = await tx.jornada.create({ data: { torneoCategoriaId: fase.torneoCategoriaId, faseCompetenciaId: fase.id, numero: indice + 1, nombre: `Liga - Jornada ${indice + 1}` } })
+      for (const [local, visitante] of ronda) {
+        if (!visitante) { await tx.jornadaEquipoDescanso.create({ data: { jornadaId: jornada.id, equipoId: local, motivo: 'DESCANSO_AUTOMATICO' } }); continue }
+        await tx.partido.create({ data: { tipo: 'OFICIAL', torneoId: fase.torneoCategoria.torneoId, temporadaId: fase.torneoCategoria.temporadaId, torneoCategoriaId: fase.torneoCategoriaId, jornadaId: jornada.id, equipoLocalId: local, equipoVisitanteId: visitante, equipoResponsableId: local, fechaHora: new Date() } })
+        cantidadPartidos++
+      }
+    }
+    const actualizada = await tx.faseCompetencia.update({ where: { id: fase.id }, data: { estado: 'GENERADA' } })
+    await auditar(tx, { entidad: 'FaseCompetencia', entidadId: fase.id, accion: 'UPDATE', usuarioId, cambios: { operacion: 'generar_liga', cantidadPartidos } })
+    return { fase: actualizada, cantidadPartidos }
+  }, { isolationLevel: 'Serializable' })
 }
 
 async function generarGrupos(db: PrismaClient, fase: FaseGenerable, usuarioId: string) {
@@ -93,21 +115,23 @@ async function generarGrupos(db: PrismaClient, fase: FaseGenerable, usuarioId: s
   }, { isolationLevel: 'Serializable' })
 }
 
-async function generarEliminacion(db: PrismaClient, fase: FaseGenerable, usuarioId: string) {
-  const semillas = (fase.configuracion as { seeds?: SeedEntrada[] }).seeds
+async function generarEliminacion(db: Db, fase: FaseGenerable, usuarioId: string, enTransaccion = false) {
+  const semillasConfiguradas = (fase.configuracion as { seeds?: SeedEntrada[] }).seeds
+  const semillas = semillasConfiguradas ?? fase.participantesFase.map((participante, indice) => ({ participacionId: participante.participacionId, seed: participante.seed ?? indice + 1 }))
   if (!semillas || semillas.length < 4) throw badRequest('Seeds inválidos')
   const tamano = siguientePotenciaDos(semillas.length)
-  return db.$transaction(async (tx) => {
+  const ejecutar = async (tx: Db) => {
     const rondas = [] as Array<{ id: string; tamano: number }>
     for (let tam = tamano, orden = 1; tam >= 2; tam /= 2, orden++) rondas.push({ ...(await tx.rondaEliminatoria.create({ data: { faseCompetenciaId: fase.id, orden, nombre: nombreRonda(tam) } })), tamano: tam })
     const primera = rondas[0]!
     const ordenadas = [...semillas].sort((a, b) => a.seed - b.seed)
     const porSeed = new Map(ordenadas.map((seed) => [seed.seed, seed.participacionId]))
+    const participantePorParticipacion = new Map(fase.participantesFase.map((participante) => [participante.participacionId, participante.id]))
     const llaves: Array<{ id: string; orden: number }> = []
     for (let i = 0; i < tamano / 2; i++) {
       const a = i + 1, b = tamano - i
       const local = porSeed.get(a) ?? null, visitante = porSeed.get(b) ?? null
-      const llave = await tx.llaveCompetencia.create({ data: { rondaEliminatoriaId: primera.id, orden: i + 1, participacionLocalId: local, participacionVisitanteId: visitante, seedLocal: local ? a : null, seedVisitante: visitante ? b : null, origenLocalTipo: local ? 'SEED' : null, origenVisitanteTipo: visitante ? 'SEED' : null, estado: local && visitante ? 'PROGRAMADA' : local || visitante ? 'BYE' : 'PENDIENTE_PARTICIPANTES', ganadorParticipacionId: local && !visitante ? local : visitante && !local ? visitante : null, metodoResolucion: local && !visitante || visitante && !local ? 'BYE' : null } })
+      const llave = await tx.llaveCompetencia.create({ data: { rondaEliminatoriaId: primera.id, orden: i + 1, participacionLocalId: local, participacionVisitanteId: visitante, participanteFaseLocalId: local ? participantePorParticipacion.get(local) : null, participanteFaseVisitanteId: visitante ? participantePorParticipacion.get(visitante) : null, seedLocal: local ? a : null, seedVisitante: visitante ? b : null, origenLocalTipo: local ? 'SEED' : null, origenVisitanteTipo: visitante ? 'SEED' : null, estado: local && visitante ? 'PROGRAMADA' : local || visitante ? 'BYE' : 'PENDIENTE_PARTICIPANTES', ganadorParticipacionId: local && !visitante ? local : visitante && !local ? visitante : null, metodoResolucion: local && !visitante || visitante && !local ? 'BYE' : null } })
       llaves.push(llave)
       if (local && visitante) {
         const [participacionLocal, participacionVisitante] = await Promise.all([tx.equipoParticipacion.findUniqueOrThrow({ where: { id: local } }), tx.equipoParticipacion.findUniqueOrThrow({ where: { id: visitante } })])
@@ -129,7 +153,8 @@ async function generarEliminacion(db: PrismaClient, fase: FaseGenerable, usuario
     const actualizada = await tx.faseCompetencia.update({ where: { id: fase.id }, data: { estado: 'GENERADA' } })
     await auditar(tx, { entidad: 'FaseCompetencia', entidadId: fase.id, accion: 'UPDATE', usuarioId, cambios: { operacion: 'generar_eliminacion', seeds: semillas, tamano } })
     return { fase: actualizada, cantidadLlaves: tamano - 1 }
-  }, { isolationLevel: 'Serializable' })
+  }
+  return enTransaccion ? ejecutar(db) : (db as PrismaClient).$transaction(ejecutar, { isolationLevel: 'Serializable' })
 }
 
 async function propagarGanador(db: Db, llaveId: string) {
@@ -169,4 +194,141 @@ export async function tablaGrupo(db: PrismaClient, faseId: string, grupoId: stri
   const reglas = leerReglas({ sistemaPuntos: grupo.faseCompetencia.sistemaPuntos, desempates: grupo.faseCompetencia.desempates })
   const partidos = await db.partido.findMany({ where: { jornada: { grupoCompetenciaId: grupo.id }, tipo: 'OFICIAL', estado: 'FINALIZADO' }, select: { equipoLocalId: true, equipoVisitanteId: true, golesLocal: true, golesVisitante: true } })
   return calcularTabla(grupo.participaciones.map((p) => p.equipo), partidos, reglas)
+}
+
+export async function crearReglaClasificacion(db: PrismaClient, faseOrigenId: string, datos: ReglaEntrada, usuarioId: string) {
+  if (!Number.isInteger(datos.orden) || datos.orden < 1 || !Number.isInteger(datos.posicionDesde) || datos.posicionDesde < 1 || datos.posicionHasta < datos.posicionDesde || !Number.isInteger(datos.seedInicio) || datos.seedInicio < 1) throw badRequest('Regla de clasificación inválida')
+  const [origen, destino] = await Promise.all([db.faseCompetencia.findUnique({ where: { id: faseOrigenId } }), db.faseCompetencia.findUnique({ where: { id: datos.faseDestinoId }, include: { grupos: true, rondas: true, participantesFase: true } })])
+  if (!origen || !destino || origen.torneoCategoriaId !== destino.torneoCategoriaId || origen.id === destino.id || origen.estado !== 'BORRADOR') throw badRequest('Fases de clasificación inválidas')
+  if (destino.estado !== 'BORRADOR' || destino.grupos.length || destino.rondas.length || destino.participantesFase.length) throw conflicto('fase_destino_bloqueada', 'La fase destino no está virgen')
+  if (datos.tipo === 'POSICION_GRUPO' && !datos.grupoCompetenciaId) throw badRequest('La posición de grupo requiere grupo')
+  if (datos.grupoCompetenciaId && !(await db.grupoCompetencia.findFirst({ where: { id: datos.grupoCompetenciaId, faseCompetenciaId: faseOrigenId } }))) throw badRequest('Grupo de origen inválido')
+  const regla = await db.reglaClasificacionFase.create({ data: { faseOrigenId, ...datos, configuracion: (datos.configuracion ?? {}) as never } })
+  await auditar(db as never, { entidad: 'ReglaClasificacionFase', entidadId: regla.id, accion: 'CREATE', usuarioId, cambios: { faseOrigenId, faseDestinoId: datos.faseDestinoId, tipo: datos.tipo } })
+  return regla
+}
+
+export async function actualizarReglaClasificacion(db: PrismaClient, reglaId: string, datos: ReglaEntrada, usuarioId: string) {
+  const regla = await db.reglaClasificacionFase.findUnique({ where: { id: reglaId }, include: { clasificados: true, faseOrigen: true } })
+  if (!regla) throw badRequest('La regla no existe')
+  if (regla.estado !== 'BORRADOR' || regla.clasificados.length || regla.faseOrigen.estado !== 'BORRADOR') throw conflicto('regla_bloqueada', 'La regla solo puede modificarse en borrador sin materialización')
+  if (!Number.isInteger(datos.posicionDesde) || datos.posicionDesde < 1 || datos.posicionHasta < datos.posicionDesde || !Number.isInteger(datos.seedInicio) || datos.seedInicio < 1 || (datos.tipo === 'POSICION_GRUPO' && !datos.grupoCompetenciaId)) throw badRequest('Regla de clasificación inválida')
+  if (datos.grupoCompetenciaId && !(await db.grupoCompetencia.findFirst({ where: { id: datos.grupoCompetenciaId, faseCompetenciaId: regla.faseOrigenId } }))) throw badRequest('Grupo de origen inválido')
+  const actualizada = await db.reglaClasificacionFase.update({ where: { id: regla.id }, data: { tipo: datos.tipo, posicionDesde: datos.posicionDesde, posicionHasta: datos.posicionHasta, cantidad: datos.cantidad, grupoCompetenciaId: datos.grupoCompetenciaId, seedTipo: datos.seedTipo, seedInicio: datos.seedInicio, configuracion: (datos.configuracion ?? {}) as never } })
+  await auditar(db, { entidad: 'ReglaClasificacionFase', entidadId: actualizada.id, accion: 'UPDATE', usuarioId, cambios: { operacion: 'actualizar_regla' } })
+  return actualizada
+}
+
+type Candidato = { reglaId: string; participacionId: string; posicion: number; seed: number; etiquetaOrigen: string; tablaSnapshot: unknown; desempatesSnapshot: unknown }
+
+async function candidatosClasificacion(db: Db, faseId: string) {
+  const fase = await db.faseCompetencia.findUnique({
+    where: { id: faseId },
+    include: {
+      grupos: { include: { participaciones: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true } } } } }, orderBy: { orden: 'asc' } },
+      reglasClasificacionOrigen: { where: { estado: { in: ['BORRADOR', 'CLASIFICADA'] } }, orderBy: { orden: 'asc' } },
+      participantesFase: { include: { participacion: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true } } } } } },
+    },
+  })
+  if (!fase) throw badRequest('La fase no existe')
+  if (!['GENERADA', 'FINALIZADA'].includes(fase.estado)) throw conflicto('fase_origen_incompleta', 'La fase origen debe estar generada o finalizada')
+  const partidos = await db.partido.findMany({ where: fase.tipo === 'GRUPOS' ? { jornada: { grupoCompetencia: { faseCompetenciaId: fase.id } } } : { jornada: { faseCompetenciaId: fase.id } }, select: { equipoLocalId: true, equipoVisitanteId: true, golesLocal: true, golesVisitante: true, estado: true } })
+  if (partidos.some((p) => p.estado !== 'FINALIZADO' || p.golesLocal === null || p.golesVisitante === null)) throw conflicto('fase_origen_incompleta', 'Todos los partidos de origen deben finalizar')
+  const reglas = leerReglas({ sistemaPuntos: fase.sistemaPuntos, desempates: fase.desempates })
+  const tabla = (participaciones: Array<{ id: string; equipo: { id: string; nombre: string; escudoUrl: string | null } }>) => calcularTabla(participaciones.map((p) => p.equipo), partidos.filter((partido) => participaciones.some((p) => p.equipo.id === partido.equipoLocalId) && participaciones.some((p) => p.equipo.id === partido.equipoVisitanteId)), reglas)
+  const grupos = new Map(fase.grupos.map((g) => [g.id, { grupo: g, tabla: tabla(g.participaciones) }]))
+  const generales = fase.tipo === 'LIGA' ? fase.participantesFase.map((p) => p.participacion) : fase.grupos.flatMap((g) => g.participaciones)
+  const general = tabla(generales)
+  const resultado: Candidato[] = []
+  for (const regla of fase.reglasClasificacionOrigen) {
+    let filas: Array<{ equipo: { id: string }; posicion?: number }> = []
+    if (regla.tipo === 'POSICION_GRUPO') filas = (grupos.get(regla.grupoCompetenciaId!)?.tabla.filas ?? []).filter((f) => f.posicion! >= regla.posicionDesde && f.posicion! <= regla.posicionHasta)
+    if (regla.tipo === 'POSICION_GENERAL') filas = general.filas.filter((f) => f.posicion! >= regla.posicionDesde && f.posicion! <= regla.posicionHasta)
+    if (regla.tipo === 'MEJORES_ENTRE_GRUPOS') {
+      const comparables = [...grupos.values()]
+      const tamaños = new Set(comparables.map((g) => g.grupo.participaciones.length))
+      if (tamaños.size !== 1) throw conflicto('clasificacion_grupos_no_comparables', 'Los grupos comparados no tienen igual cantidad de participantes')
+      filas = comparables.flatMap((g) => g.tabla.filas.filter((f) => f.posicion! >= regla.posicionDesde && f.posicion! <= regla.posicionHasta)).sort((a, b) => b.PTS - a.PTS || b.DG - a.DG || b.GF - a.GF).slice(0, regla.cantidad ?? 0)
+    }
+    const esperada = regla.tipo === 'MEJORES_ENTRE_GRUPOS' ? regla.cantidad : regla.posicionHasta - regla.posicionDesde + 1
+    if (filas.length !== esperada) throw conflicto('clasificacion_incompleta', 'La regla no produjo cantidad esperada')
+    const configuracion = regla.configuracion as { seed?: unknown; seeds?: unknown }
+    const seedsExplicitos = Array.isArray(configuracion.seeds) && configuracion.seeds.every((seed) => Number.isInteger(seed) && (seed as number) > 0) ? configuracion.seeds as number[] : undefined
+    if (regla.seedTipo === 'CRUCE_EXPLICITO' && !seedsExplicitos && (!Number.isInteger(configuracion.seed) || (configuracion.seed as number) < 1)) throw badRequest('Cruce explícito requiere seed o seeds válidos')
+    for (const [indice, fila] of filas.entries()) {
+      const participacion = generales.find((p) => p.equipoId === fila.equipo.id)
+      if (!participacion) throw badRequest('Participación de clasificación inválida')
+      const seed = seedsExplicitos?.[indice] ?? (regla.seedTipo === 'CRUCE_EXPLICITO' ? configuracion.seed as number : regla.seedInicio + indice)
+      if (!Number.isInteger(seed) || seed < 1) throw badRequest('Cruce explícito incompleto')
+      resultado.push({ reglaId: regla.id, participacionId: participacion.id, posicion: fila.posicion ?? indice + 1, seed, etiquetaOrigen: `Posición ${fila.posicion ?? indice + 1}`, tablaSnapshot: fila, desempatesSnapshot: reglas })
+    }
+  }
+  if (new Set(resultado.map((r) => r.participacionId)).size !== resultado.length) throw conflicto('clasificacion_duplicada', 'Una participación clasifica más de una vez')
+  return { fase, candidatos: resultado }
+}
+
+export async function previsualizarClasificacion(db: PrismaClient, faseId: string) { return candidatosClasificacion(db, faseId) }
+
+export async function clasificarFase(db: PrismaClient, faseId: string, usuarioId: string) {
+  return db.$transaction(async (tx) => {
+    const previo = await tx.reglaClasificacionFase.findMany({ where: { faseOrigenId: faseId, estado: 'CLASIFICADA' }, include: { clasificados: true } })
+    if (previo.length) return { idempotente: true, clasificados: previo.flatMap((r) => r.clasificados) }
+    const { fase, candidatos } = await candidatosClasificacion(tx, faseId)
+    const destinos = new Set((await tx.reglaClasificacionFase.findMany({ where: { faseOrigenId: faseId }, select: { faseDestinoId: true } })).map((r) => r.faseDestinoId))
+    for (const destinoId of destinos) {
+      const destino = await tx.faseCompetencia.findUniqueOrThrow({ where: { id: destinoId }, include: { grupos: true, rondas: true, participantesFase: true } })
+      if (destino.estado !== 'BORRADOR' || destino.grupos.length || destino.rondas.length || destino.participantesFase.length) throw conflicto('fase_destino_bloqueada', 'La fase destino no está virgen')
+    }
+    const clasificados = []
+    for (const candidato of candidatos) clasificados.push(await tx.clasificadoFase.create({ data: { reglaClasificacionId: candidato.reglaId, participacionId: candidato.participacionId, posicion: candidato.posicion, seed: candidato.seed, etiquetaOrigen: candidato.etiquetaOrigen, tablaSnapshot: candidato.tablaSnapshot as never, desempatesSnapshot: candidato.desempatesSnapshot as never } }))
+    const reglas = await tx.reglaClasificacionFase.findMany({ where: { faseOrigenId: faseId } })
+    for (const clasificado of clasificados) {
+      const regla = reglas.find((r) => r.id === clasificado.reglaClasificacionId)!
+      await tx.participanteFase.create({ data: { faseCompetenciaId: regla.faseDestinoId, participacionId: clasificado.participacionId, clasificadoOrigenId: clasificado.id, seed: clasificado.seed } })
+    }
+    await tx.reglaClasificacionFase.updateMany({ where: { faseOrigenId: faseId }, data: { estado: 'CLASIFICADA' } })
+    for (const destinoId of destinos) {
+      const destino = await tx.faseCompetencia.findUniqueOrThrow({ where: { id: destinoId }, include: { grupos: { include: { participaciones: true } }, participantesFase: { include: { participacion: true }, orderBy: { seed: 'asc' } }, torneoCategoria: true } })
+      if (destino.tipo !== 'ELIMINACION_DIRECTA') throw badRequest('La clasificación automática solo admite destino de eliminación directa')
+      await generarEliminacion(tx, destino as unknown as FaseGenerable, usuarioId, true)
+    }
+    await auditar(tx, { entidad: 'FaseCompetencia', entidadId: fase.id, accion: 'UPDATE', usuarioId, cambios: { operacion: 'clasificar', cantidad: clasificados.length } })
+    return { idempotente: false, clasificados }
+  }, { isolationLevel: 'Serializable' })
+}
+
+export async function invalidarClasificacion(db: PrismaClient, faseId: string, usuarioId: string) {
+  return db.$transaction(async (tx) => {
+    const reglas = await tx.reglaClasificacionFase.findMany({ where: { faseOrigenId: faseId, estado: 'CLASIFICADA' }, include: { clasificados: true } })
+    if (!reglas.length) throw conflicto('clasificacion_inexistente', 'No existe clasificación materializada')
+    const destinos = [...new Set(reglas.map((r) => r.faseDestinoId))]
+    const pendientes = [...destinos]
+    const arbol = new Set(destinos)
+    while (pendientes.length) {
+      const actual = pendientes.pop()!
+      const siguientes = await tx.reglaClasificacionFase.findMany({ where: { faseOrigenId: actual, estado: 'CLASIFICADA' }, select: { faseDestinoId: true } })
+      for (const siguiente of siguientes) if (!arbol.has(siguiente.faseDestinoId)) { arbol.add(siguiente.faseDestinoId); pendientes.push(siguiente.faseDestinoId) }
+    }
+    const posteriores = await tx.reglaClasificacionFase.count({ where: { faseOrigenId: { in: [...arbol] }, estado: 'CLASIFICADA' } })
+    if (posteriores) throw conflicto('fase_destino_historica', 'Existe clasificación posterior materializada')
+    for (const destinoId of destinos) {
+      const llaves = await tx.llaveCompetencia.findMany({ where: { rondaEliminatoria: { faseCompetenciaId: destinoId } }, include: { partidos: true } })
+      const partidos = await tx.partido.findMany({ where: { OR: [{ jornada: { grupoCompetencia: { faseCompetenciaId: destinoId } } }, { jornada: { faseCompetenciaId: destinoId } }, { llaveCompetencia: { rondaEliminatoria: { faseCompetenciaId: destinoId } } }] } })
+      if (llaves.some((l) => ['RESUELTA', 'PENDIENTE_DEFINICION', 'EN_CURSO'].includes(l.estado)) || partidos.some((p) => p.estado !== 'PROGRAMADO' || p.golesLocal !== null || p.golesVisitante !== null || p.publicada)) throw conflicto('fase_destino_historica', 'La fase destino contiene actividad')
+      const ids = partidos.map((p) => p.id)
+      const actividad = ids.length ? await Promise.all([tx.eventoPartido.count({ where: { partidoId: { in: ids } } }), tx.convocatoria.count({ where: { partidoId: { in: ids } } }), tx.formacionInstancia.count({ where: { partidoId: { in: ids } } }), tx.sancion.count({ where: { partidoId: { in: ids } } })]) : [0]
+      if (actividad.some(Boolean)) throw conflicto('fase_destino_historica', 'La fase destino contiene dependencias históricas')
+      await tx.partido.deleteMany({ where: { id: { in: ids } } })
+      await tx.jornadaEquipoDescanso.deleteMany({ where: { jornada: { OR: [{ grupoCompetencia: { faseCompetenciaId: destinoId } }, { faseCompetenciaId: destinoId }] } } })
+      await tx.jornada.deleteMany({ where: { OR: [{ grupoCompetencia: { faseCompetenciaId: destinoId } }, { faseCompetenciaId: destinoId }] } })
+      await tx.llaveCompetencia.deleteMany({ where: { rondaEliminatoria: { faseCompetenciaId: destinoId } } })
+      await tx.rondaEliminatoria.deleteMany({ where: { faseCompetenciaId: destinoId } })
+      await tx.participanteFase.deleteMany({ where: { faseCompetenciaId: destinoId } })
+      await tx.faseCompetencia.update({ where: { id: destinoId }, data: { estado: 'BORRADOR' } })
+    }
+    await tx.clasificadoFase.deleteMany({ where: { reglaClasificacionId: { in: reglas.map((r) => r.id) } } })
+    await tx.reglaClasificacionFase.updateMany({ where: { id: { in: reglas.map((r) => r.id) } }, data: { estado: 'INVALIDADA' } })
+    await auditar(tx, { entidad: 'FaseCompetencia', entidadId: faseId, accion: 'UPDATE', usuarioId, cambios: { operacion: 'invalidar_clasificacion', destinos } })
+    return { destinos }
+  }, { isolationLevel: 'Serializable' })
 }

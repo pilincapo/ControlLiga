@@ -51,6 +51,29 @@ function ValorPublico({ valor }: { valor: Dato }) {
   )
 }
 
+type FasePublica = {
+  id: string
+  orden: number
+  nombre: string
+  tipo: string
+  estado: string
+  participantesFase: Array<{ id: string; seed: number | null; participacion: { equipo: { nombre: string } }; clasificadoOrigen: { reglaClasificacion: { faseOrigenId: string } } | null }>
+  reglasClasificacionOrigen: Array<{ id: string; tipo: string; estado: string; clasificados: Array<{ id: string; seed: number; etiquetaOrigen: string; participacion: { equipo: { nombre: string } } }> }>
+  grupos: Array<{ id: string; nombre: string; participaciones: Array<{ id: string; equipo: { nombre: string } }> }>
+  rondas: Array<{ id: string; nombre: string; llaves: Array<{ id: string; estado: string; participacionLocal: { equipo: { nombre: string } } | null; participacionVisitante: { equipo: { nombre: string } } | null; ganadorParticipacion: { equipo: { nombre: string } } | null }> }>
+}
+
+function FasesPublicas({ fases }: { fases: FasePublica[] }) {
+  if (fases.length === 0) return <PageState tipo="vacio" detalle="No hay fases publicadas." />
+  return <div className="portal-lista">{fases.map((fase) => <article className="tarjeta" key={fase.id}>
+    <h3>{fase.orden}. {fase.nombre} <StatusBadge valor={fase.tipo} /> <StatusBadge valor={fase.estado} /></h3>
+    {fase.grupos.map((grupo) => <p key={grupo.id}><strong>Grupo {grupo.nombre}:</strong> {grupo.participaciones.map((p) => p.equipo.nombre).join(', ') || 'Sin participantes visibles'}</p>)}
+    {fase.participantesFase.length > 0 && <section><h4>Participantes clasificados</h4><ul className="lista">{fase.participantesFase.map((participante) => <li key={participante.id}>{participante.participacion.equipo.nombre}{participante.seed !== null && ` · Seed ${participante.seed}`}{participante.clasificadoOrigen && ' · Clasificado desde fase previa'}</li>)}</ul></section>}
+    {fase.reglasClasificacionOrigen.length > 0 && <section><h4>Clasificación</h4><ul className="lista">{fase.reglasClasificacionOrigen.map((regla) => <li key={regla.id}>{regla.tipo.replaceAll('_', ' ').toLowerCase()} <StatusBadge valor={regla.estado} />{regla.clasificados.length > 0 && <ul>{regla.clasificados.map((clasificado) => <li key={clasificado.id}>{clasificado.participacion.equipo.nombre} · {clasificado.etiquetaOrigen} · Seed {clasificado.seed}</li>)}</ul>}</li>)}</ul></section>}
+    {fase.rondas.map((ronda) => <section key={ronda.id}><h4>{ronda.nombre}</h4><ul className="lista">{ronda.llaves.map((llave) => <li key={llave.id}>{llave.participacionLocal?.equipo.nombre ?? 'A definir'} vs {llave.participacionVisitante?.equipo.nombre ?? 'A definir'} <StatusBadge valor={llave.estado} />{llave.ganadorParticipacion && ` · Ganador: ${llave.ganadorParticipacion.equipo.nombre}`}</li>)}</ul></section>)}
+  </article>)}</div>
+}
+
 export default function PublicResourcePage() {
   const location = useLocation()
   const params = useParams<{ id: string }>()
@@ -110,7 +133,7 @@ export default function PublicResourcePage() {
         ) : data === null ? (
           <PageState tipo="cargando" />
         ) : (
-          <ValorPublico valor={data} />
+          location.pathname.endsWith('/fases') && Array.isArray(data) ? <FasesPublicas fases={data as FasePublica[]} /> : <ValorPublico valor={data} />
         )}
       </div>
     </main>

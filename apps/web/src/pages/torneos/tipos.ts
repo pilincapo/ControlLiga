@@ -76,6 +76,26 @@ export interface FaseCompetencia {
   nombre: string
   tipo: 'GRUPOS' | 'ELIMINACION_DIRECTA'
   estado: string
+  participantesFase: Array<{
+    id: string
+    seed: number | null
+    participacion: { equipo: { nombre: string } }
+    clasificadoOrigen: { etiquetaOrigen: string } | null
+  }>
+  reglasClasificacionOrigen: Array<{
+    id: string
+    faseDestinoId: string
+    orden: number
+    tipo: 'POSICION_GRUPO' | 'MEJORES_ENTRE_GRUPOS' | 'POSICION_GENERAL'
+    posicionDesde: number
+    posicionHasta: number
+    cantidad: number | null
+    grupoCompetenciaId: string | null
+    seedTipo: 'ORDEN_CLASIFICACION' | 'CRUCE_EXPLICITO'
+    seedInicio: number
+    estado: string
+    clasificados: Array<{ id: string; participacionId: string; posicion: number; seed: number; etiquetaOrigen: string }>
+  }>
   grupos: Array<{
     id: string
     nombre: string

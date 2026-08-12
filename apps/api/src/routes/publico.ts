@@ -140,6 +140,8 @@ export async function publicoRoutes(app: FastifyInstance): Promise<void> {
     const fases = await getPrisma().faseCompetencia.findMany({
       where: { torneoCategoriaId: id },
       include: {
+        participantesFase: { where: { participacion: { equipo: { privado: false } } }, include: { participacion: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true } } } }, clasificadoOrigen: { include: { reglaClasificacion: { select: { faseOrigenId: true } } } } }, orderBy: { seed: 'asc' } },
+        reglasClasificacionOrigen: { include: { clasificados: { where: { participacion: { equipo: { privado: false } } }, include: { participacion: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true } } } } }, orderBy: { seed: 'asc' } } } },
         grupos: { include: { participaciones: { where: { equipo: { privado: false } }, include: { equipo: { select: { id: true, nombre: true, escudoUrl: true } } } } }, orderBy: { orden: 'asc' } },
         rondas: { include: { llaves: { include: { participacionLocal: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true, privado: true } } } }, participacionVisitante: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true, privado: true } } } }, ganadorParticipacion: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true, privado: true } } } }, partidos: { where: { publicada: true }, select: { id: true, fechaHora: true, estado: true, golesLocal: true, golesVisitante: true } } }, orderBy: { orden: 'asc' } } }, orderBy: { orden: 'asc' } },
       }, orderBy: { orden: 'asc' },

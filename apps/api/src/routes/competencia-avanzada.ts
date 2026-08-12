@@ -4,7 +4,7 @@ import { getPrisma } from '../db.js'
 import { getAuth, requierePermiso } from '../plugins/auth.js'
 import { esAdminDeTorneo, puedeVerTorneo } from '../auth/permisos.js'
 import { badRequest, conflicto, noEncontrado, prohibido } from '../http.js'
-import { crearFaseEliminacion, crearFaseGrupos, generarFase, tablaGrupo } from '../competencia-avanzada/servicio.js'
+import { actualizarReglaClasificacion, clasificarFase, crearFaseEliminacion, crearFaseGrupos, crearReglaClasificacion, generarFase, invalidarClasificacion, previsualizarClasificacion, tablaGrupo } from '../competencia-avanzada/servicio.js'
 
 async function administrar(id: string, auth: ReturnType<typeof getAuth>) {
   const tc = await getPrisma().torneoCategoria.findUnique({ where: { id }, select: { torneoId: true } })
@@ -49,6 +49,38 @@ export async function competenciaAvanzadaRoutes(app: FastifyInstance): Promise<v
     await administrar(fase.torneoCategoriaId, auth)
     return { data: await generarFase(getPrisma(), id, auth.usuarioId) }
   })
+  app.post('/fases-competencia/:id/reglas-clasificacion', { preHandler: requierePermiso(PERMISOS.torneosAdministrar) }, async (request) => {
+    const auth = getAuth(request); const { id } = request.params as { id: string }
+    const fase = await getPrisma().faseCompetencia.findUnique({ where: { id }, select: { torneoCategoriaId: true } }); if (!fase) throw noEncontrado('Fase')
+    await administrar(fase.torneoCategoriaId, auth)
+    return { data: await crearReglaClasificacion(getPrisma(), id, request.body as never, auth.usuarioId) }
+  })
+  app.patch('/reglas-clasificacion/:id', { preHandler: requierePermiso(PERMISOS.torneosAdministrar) }, async (request) => {
+    const auth = getAuth(request); const { id } = request.params as { id: string }
+    const regla = await getPrisma().reglaClasificacionFase.findUnique({ where: { id }, select: { faseOrigen: { select: { torneoCategoriaId: true } } } }); if (!regla) throw noEncontrado('Regla')
+    await administrar(regla.faseOrigen.torneoCategoriaId, auth)
+    return { data: await actualizarReglaClasificacion(getPrisma(), id, request.body as never, auth.usuarioId) }
+  })
+  app.get('/fases-competencia/:id/clasificacion/preview', { preHandler: requierePermiso(PERMISOS.torneosVer) }, async (request) => {
+    const auth = getAuth(request); const { id } = request.params as { id: string }
+    const fase = await getPrisma().faseCompetencia.findUnique({ where: { id }, select: { torneoCategoria: { select: { torneoId: true } } } }); if (!fase) throw noEncontrado('Fase')
+    if (!(await puedeVerTorneo(getPrisma(), auth, fase.torneoCategoria.torneoId))) throw prohibido('No tenés acceso a esa fase')
+    return { data: await previsualizarClasificacion(getPrisma(), id) }
+  })
+  app.post('/fases-competencia/:id/clasificar', { preHandler: requierePermiso(PERMISOS.torneosAdministrar) }, async (request) => {
+    const auth = getAuth(request); const { id } = request.params as { id: string }; const body = request.body as { confirmar?: boolean }
+    if (body.confirmar !== true) throw badRequest('La clasificación requiere confirmar: true')
+    const fase = await getPrisma().faseCompetencia.findUnique({ where: { id }, select: { torneoCategoriaId: true } }); if (!fase) throw noEncontrado('Fase')
+    await administrar(fase.torneoCategoriaId, auth)
+    return { data: await clasificarFase(getPrisma(), id, auth.usuarioId) }
+  })
+  app.post('/fases-competencia/:id/invalidar-clasificacion', { preHandler: requierePermiso(PERMISOS.torneosAdministrar) }, async (request) => {
+    const auth = getAuth(request); const { id } = request.params as { id: string }; const body = request.body as { confirmar?: boolean }
+    if (body.confirmar !== true) throw badRequest('La invalidación requiere confirmar: true')
+    const fase = await getPrisma().faseCompetencia.findUnique({ where: { id }, select: { torneoCategoriaId: true } }); if (!fase) throw noEncontrado('Fase')
+    await administrar(fase.torneoCategoriaId, auth)
+    return { data: await invalidarClasificacion(getPrisma(), id, auth.usuarioId) }
+  })
   app.post('/fases-competencia/:id/regenerar', { preHandler: requierePermiso(PERMISOS.torneosAdministrar) }, async (request) => {
     const auth = getAuth(request); const { id } = request.params as { id: string }; const body = request.body as { confirmar?: boolean }
     if (body.confirmar !== true) throw badRequest('La regeneración requiere confirmar: true')
@@ -62,7 +94,17 @@ export async function competenciaAvanzadaRoutes(app: FastifyInstance): Promise<v
   })
   app.get('/torneo-categorias/:id/competencia-avanzada', { preHandler: requierePermiso(PERMISOS.torneosVer) }, async (request) => {
     const auth = getAuth(request); const { id } = request.params as { id: string }; const tc = await getPrisma().torneoCategoria.findUnique({ where: { id }, select: { torneoId: true } }); if (!tc) throw noEncontrado('Competición'); if (!(await puedeVerTorneo(getPrisma(), auth, tc.torneoId))) throw prohibido('No tenés acceso a esa competición')
-    return { data: await getPrisma().faseCompetencia.findMany({ where: { torneoCategoriaId: id }, include: { grupos: { include: { participaciones: { include: { equipo: { select: { id: true, nombre: true } } } } } }, rondas: { include: { llaves: { include: { participacionLocal: { select: { id: true, equipoId: true, equipo: { select: { nombre: true, escudoUrl: true } } } }, participacionVisitante: { select: { id: true, equipoId: true, equipo: { select: { nombre: true, escudoUrl: true } } } }, ganadorParticipacion: { select: { id: true, equipoId: true, equipo: { select: { nombre: true, escudoUrl: true } } } }, partidos: true } } } } }, orderBy: { orden: 'asc' } }) }
+    const fases = await getPrisma().faseCompetencia.findMany({
+      where: { torneoCategoriaId: id },
+      include: {
+        participantesFase: { include: { participacion: { include: { equipo: { select: { id: true, nombre: true, escudoUrl: true } } } }, clasificadoOrigen: true } },
+        reglasClasificacionOrigen: { include: { clasificados: true } },
+        grupos: { include: { participaciones: { include: { equipo: { select: { id: true, nombre: true } } } } } },
+        rondas: { include: { llaves: { include: { participacionLocal: { select: { id: true, equipoId: true, equipo: { select: { nombre: true, escudoUrl: true } } } }, participacionVisitante: { select: { id: true, equipoId: true, equipo: { select: { nombre: true, escudoUrl: true } } } }, ganadorParticipacion: { select: { id: true, equipoId: true, equipo: { select: { nombre: true, escudoUrl: true } } } }, partidos: true } } } },
+      },
+      orderBy: { orden: 'asc' },
+    })
+    return { data: fases }
   })
   app.get('/fases-competencia/:id/grupos/:grupoId/tabla', { preHandler: requierePermiso(PERMISOS.torneosVer) }, async (request) => {
     const auth = getAuth(request); const { id, grupoId } = request.params as { id: string; grupoId: string }; const fase = await getPrisma().faseCompetencia.findUnique({ where: { id }, select: { torneoCategoria: { select: { torneoId: true } } } }); if (!fase) throw noEncontrado('Fase'); if (!(await puedeVerTorneo(getPrisma(), auth, fase.torneoCategoria.torneoId))) throw prohibido('No tenés acceso a esa fase')

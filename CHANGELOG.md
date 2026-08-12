@@ -6,13 +6,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ### Agregado
 
+- Cobertura HTTP/integración FASE 16B para clasificación de grupos y LIGA, snapshots, idempotencia, invalidación, mejores terceros, RBAC y privacidad pública.
+- FASE 16B backend: reglas de clasificación, clasificados y participantes por fase, transición trazable con seeds y FK restrictivas para llaves.
+- FASE 16B: clasificación transaccional ahora materializa participantes y genera eliminación destino con slots de participante-fase; tablas y partidos quedan limitados a fase origen, incluyendo LIGA.
 - FASE 16A backend: fases de grupos y eliminación directa con seeds manuales, BYE, llaves estructurales, avance seguro, tablas con snapshots y regeneración bloqueada ante actividad.
 - FASE 16A web: administración privada de fases de grupos y eliminación directa desde participaciones confirmadas, con confirmación de generación/regeneración y visualización de grupos, rondas y llaves.
+- FASE 16B web: reglas de clasificación entre fases seleccionadas, vista previa, confirmación/invalidez protegida, trazabilidad visible de participantes/origen/seeds y portal público legible.
 - Portal público FASE 16A para fases, grupos, rondas y llaves, sujeto a `mostrarFixture` y sin exponer equipos privados.
 
 ### Documentación
 
 - Diseño propuesto de FASE 16 para competencia avanzada, con recomendación de dividir grupos/eliminación, clasificación y series ida/vuelta en entregas compatibles con historial.
+- Diseño de FASE 16B para clasificación automática, transiciones entre fases, snapshots, trazabilidad y bloqueo histórico.
 
 ## [0.15.0] - 2026-08-11
 

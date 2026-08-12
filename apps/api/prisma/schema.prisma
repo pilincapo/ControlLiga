@@ -63,6 +63,24 @@ enum EstadoFaseCompetencia {
   BLOQUEADA
 }
 
+enum TipoReglaClasificacion {
+  POSICION_GRUPO
+  MEJORES_ENTRE_GRUPOS
+  POSICION_GENERAL
+}
+
+enum EstadoReglaClasificacion {
+  BORRADOR
+  CLASIFICADA
+  INVALIDADA
+  BLOQUEADA
+}
+
+enum TipoSeedClasificacion {
+  ORDEN_CLASIFICACION
+  CRUCE_EXPLICITO
+}
+
 enum EstadoLlaveCompetencia {
   PENDIENTE_PARTICIPANTES
   PROGRAMADA
@@ -546,6 +564,8 @@ model EquipoParticipacion {
   invitadoPor       Usuario?            @relation("EquipoParticipacionInvitador", fields: [invitadoPorId], references: [id])
   grupoCompetenciaId String?             @db.Uuid
   grupoCompetencia   GrupoCompetencia?   @relation(fields: [grupoCompetenciaId], references: [id], onDelete: Restrict)
+  clasificaciones    ClasificadoFase[]
+  fases              ParticipanteFase[]
   jugadores         JugadorParticipacion[]
   llavesLocal       LlaveCompetencia[]   @relation("LlaveLocal")
   llavesVisitante   LlaveCompetencia[]   @relation("LlaveVisitante")
@@ -603,7 +623,11 @@ model FaseCompetencia {
   sistemaPuntos     Json?
   desempates        Json?
   grupos            GrupoCompetencia[]
+  jornadas          Jornada[]
   rondas            RondaEliminatoria[]
+  reglasClasificacionOrigen  ReglaClasificacionFase[] @relation("ReglaClasificacionOrigen")
+  reglasClasificacionDestino ReglaClasificacionFase[] @relation("ReglaClasificacionDestino")
+  participantesFase          ParticipanteFase[]
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
@@ -620,6 +644,7 @@ model GrupoCompetencia {
   nombre            String
   participaciones   EquipoParticipacion[]
   jornadas          Jornada[]
+  reglasClasificacion ReglaClasificacionFase[]
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
@@ -627,6 +652,74 @@ model GrupoCompetencia {
   @@unique([faseCompetenciaId, nombre])
   @@index([faseCompetenciaId])
   @@map("grupos_competencia")
+}
+
+model ReglaClasificacionFase {
+  id                 String                   @id @default(uuid()) @db.Uuid
+  faseOrigenId       String                   @db.Uuid
+  faseOrigen         FaseCompetencia          @relation("ReglaClasificacionOrigen", fields: [faseOrigenId], references: [id], onDelete: Restrict)
+  faseDestinoId      String                   @db.Uuid
+  faseDestino        FaseCompetencia          @relation("ReglaClasificacionDestino", fields: [faseDestinoId], references: [id], onDelete: Restrict)
+  orden              Int
+  tipo               TipoReglaClasificacion
+  posicionDesde      Int
+  posicionHasta      Int
+  cantidad           Int?
+  grupoCompetenciaId String?                  @db.Uuid
+  grupoCompetencia   GrupoCompetencia?        @relation(fields: [grupoCompetenciaId], references: [id], onDelete: Restrict)
+  seedTipo           TipoSeedClasificacion
+  seedInicio         Int
+  configuracion      Json
+  estado             EstadoReglaClasificacion @default(BORRADOR)
+  clasificados       ClasificadoFase[]
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@unique([faseDestinoId, orden])
+  @@index([faseOrigenId, estado])
+  @@index([faseDestinoId, estado])
+  @@index([grupoCompetenciaId])
+  @@map("reglas_clasificacion_fase")
+}
+
+model ClasificadoFase {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  reglaClasificacionId String                  @db.Uuid
+  reglaClasificacion   ReglaClasificacionFase  @relation(fields: [reglaClasificacionId], references: [id], onDelete: Restrict)
+  participacionId      String                  @db.Uuid
+  participacion        EquipoParticipacion     @relation(fields: [participacionId], references: [id], onDelete: Restrict)
+  posicion             Int
+  seed                 Int
+  etiquetaOrigen       String
+  tablaSnapshot        Json
+  desempatesSnapshot   Json
+  participanteDestino  ParticipanteFase?
+  createdAt            DateTime                @default(now())
+
+  @@unique([reglaClasificacionId, participacionId])
+  @@unique([reglaClasificacionId, posicion])
+  @@unique([reglaClasificacionId, seed])
+  @@index([participacionId])
+  @@map("clasificados_fase")
+}
+
+model ParticipanteFase {
+  id                  String              @id @default(uuid()) @db.Uuid
+  faseCompetenciaId   String              @db.Uuid
+  faseCompetencia     FaseCompetencia     @relation(fields: [faseCompetenciaId], references: [id], onDelete: Restrict)
+  participacionId     String              @db.Uuid
+  participacion       EquipoParticipacion @relation(fields: [participacionId], references: [id], onDelete: Restrict)
+  clasificadoOrigenId String?             @unique @db.Uuid
+  clasificadoOrigen   ClasificadoFase?    @relation(fields: [clasificadoOrigenId], references: [id], onDelete: Restrict)
+  seed                Int?
+  llaveLocal          LlaveCompetencia[]  @relation("LlaveParticipanteFaseLocal")
+  llaveVisitante      LlaveCompetencia[]  @relation("LlaveParticipanteFaseVisitante")
+  createdAt           DateTime            @default(now())
+
+  @@unique([faseCompetenciaId, participacionId])
+  @@unique([faseCompetenciaId, seed])
+  @@index([participacionId])
+  @@map("participantes_fase")
 }
 
 model RondaEliminatoria {
@@ -653,6 +746,10 @@ model LlaveCompetencia {
   participacionLocal       EquipoParticipacion?   @relation("LlaveLocal", fields: [participacionLocalId], references: [id], onDelete: Restrict)
   participacionVisitanteId String?                @db.Uuid
   participacionVisitante   EquipoParticipacion?   @relation("LlaveVisitante", fields: [participacionVisitanteId], references: [id], onDelete: Restrict)
+  participanteFaseLocalId  String?                @db.Uuid
+  participanteFaseLocal    ParticipanteFase?      @relation("LlaveParticipanteFaseLocal", fields: [participanteFaseLocalId], references: [id], onDelete: Restrict)
+  participanteFaseVisitanteId String?             @db.Uuid
+  participanteFaseVisitante ParticipanteFase?     @relation("LlaveParticipanteFaseVisitante", fields: [participanteFaseVisitanteId], references: [id], onDelete: Restrict)
   seedLocal                Int?
   seedVisitante            Int?
   origenLocalTipo          TipoOrigenLlave?
@@ -680,6 +777,8 @@ model LlaveCompetencia {
   @@index([llaveSiguienteId])
   @@index([participacionLocalId])
   @@index([participacionVisitanteId])
+  @@index([participanteFaseLocalId])
+  @@index([participanteFaseVisitanteId])
   @@map("llaves_competencia")
 }
 
@@ -691,6 +790,8 @@ model Jornada {
   zona              Zona?                    @relation(fields: [zonaId], references: [id])
   grupoCompetenciaId String?                  @db.Uuid
   grupoCompetencia   GrupoCompetencia?        @relation(fields: [grupoCompetenciaId], references: [id], onDelete: Restrict)
+  faseCompetenciaId  String?                  @db.Uuid
+  faseCompetencia    FaseCompetencia?         @relation(fields: [faseCompetenciaId], references: [id], onDelete: Restrict)
   numero            Int
   nombre            String?
   fechaInicio       DateTime?
@@ -702,6 +803,7 @@ model Jornada {
 
   @@index([torneoCategoriaId])
   @@index([grupoCompetenciaId])
+  @@index([faseCompetenciaId])
   @@map("jornadas")
 }
 

@@ -24,7 +24,7 @@ function renderFases(permisos: Permiso[]) {
   )
 }
 
-describe('FasesCompetenciaSection FASE 16A', () => {
+describe('FasesCompetenciaSection FASE 16', () => {
   beforeEach(() => mockApiFetch.mockReset())
 
   it('oculta administración sin permiso', async () => {
@@ -72,5 +72,43 @@ describe('FasesCompetenciaSection FASE 16A', () => {
     expect(screen.getAllByText('A definir')).toHaveLength(1)
     expect(screen.getByText((_, elemento) => elemento?.tagName === 'LI' && elemento.textContent?.includes('Equipo Tres — BYE') === true)).toBeInTheDocument()
     expect(screen.getByText('pendiente definicion')).toBeInTheDocument()
+  })
+
+  it('crea reglas con fases y grupos cargados, sin UUID manual', async () => {
+    mockApiFetch.mockResolvedValueOnce([
+      { id: 'f1', orden: 1, nombre: 'Grupos', tipo: 'GRUPOS', estado: 'GENERADA', participantesFase: [], reglasClasificacionOrigen: [], grupos: [{ id: 'g1', nombre: 'A', participaciones: [] }], rondas: [] },
+      { id: 'f2', orden: 2, nombre: 'Semifinales', tipo: 'ELIMINACION_DIRECTA', estado: 'BORRADOR', participantesFase: [], reglasClasificacionOrigen: [], grupos: [], rondas: [] },
+    ])
+    renderFases(['torneos:administrar'])
+    fireEvent.change(await screen.findByLabelText('Fase origen'), { target: { value: 'f1' } })
+    fireEvent.change(screen.getByLabelText('Fase destino'), { target: { value: 'f2' } })
+    fireEvent.change(screen.getByLabelText('Grupo origen'), { target: { value: 'g1' } })
+    mockApiFetch.mockResolvedValueOnce({})
+    mockApiFetch.mockResolvedValueOnce([])
+    fireEvent.click(screen.getByRole('button', { name: 'Crear regla' }))
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledWith(
+      '/fases-competencia/f1/reglas-clasificacion',
+      expect.objectContaining({ method: 'POST', body: expect.stringContaining('"faseDestinoId":"f2"') }),
+    ))
+  })
+
+  it('previsualiza y confirma clasificación con diálogo', async () => {
+    mockApiFetch.mockResolvedValueOnce([{
+      id: 'f1', orden: 1, nombre: 'Grupos', tipo: 'GRUPOS', estado: 'GENERADA', participantesFase: [], grupos: [], rondas: [],
+      reglasClasificacionOrigen: [{ id: 'r1', faseDestinoId: 'f2', orden: 1, tipo: 'POSICION_GENERAL', posicionDesde: 1, posicionHasta: 2, cantidad: null, grupoCompetenciaId: null, seedTipo: 'ORDEN_CLASIFICACION', seedInicio: 1, estado: 'BORRADOR', clasificados: [] }],
+    }])
+    renderFases(['torneos:administrar'])
+    mockApiFetch.mockResolvedValueOnce({ candidatos: [{ participacionId: 'p1', posicion: 1, seed: 1, etiquetaOrigen: 'Posición 1' }] })
+    fireEvent.click(await screen.findByRole('button', { name: 'Previsualizar clasificación' }))
+    expect(await screen.findByText(/Equipo 1.*Posición 1.*Seed 1/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar clasificación' }))
+    expect(screen.getByRole('dialog', { name: 'Confirmar clasificación' })).toBeInTheDocument()
+    mockApiFetch.mockResolvedValueOnce({})
+    mockApiFetch.mockResolvedValueOnce([])
+    fireEvent.click(screen.getByRole('button', { name: 'Clasificar' }))
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledWith(
+      '/fases-competencia/f1/clasificar',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ confirmar: true }) }),
+    ))
   })
 })
