@@ -3,7 +3,7 @@ import { PERMISOS } from '@controlliga/shared'
 import { getPrisma } from '../db.js'
 import { auditar } from '../auth/auditoria.js'
 import { autenticar, getAuth, requierePermiso } from '../plugins/auth.js'
-import { esAdminDeTorneo, esDelegadoDelJugador, esMiembroEquipo, esSuperadmin, puedeEnEquipo, puedeVerEquipo, puedeVerTorneo } from '../auth/permisos.js'
+import { esAdminDeTorneo, esAdministradorOrganizacion, esAdministradorTorneo, esDelegadoDelJugador, esMiembroEquipo, esSuperadmin, puedeEnEquipo, puedeVerEquipo, puedeVerTorneo } from '../auth/permisos.js'
 import { badRequest, conflicto, noEncontrado, prohibido } from '../http.js'
 import { EstadoEquipoJugador, EstadoPartido, TipoEventoPartido } from '../generated/prisma/enums.js'
 
@@ -36,9 +36,10 @@ function esAdministrador(auth: ReturnType<typeof getAuth>): boolean {
 }
 
 async function puedeVerPartido(prisma: ReturnType<typeof getPrisma>, auth: ReturnType<typeof getAuth>, partidoId: string): Promise<boolean> {
-  if (esAdministrador(auth)) return true
-  const partido = await prisma.partido.findUnique({ where: { id: partidoId }, select: { publicada: true, equipoLocalId: true, equipoVisitanteId: true, equipoLocal: { select: { privado: true } }, equipoVisitante: { select: { privado: true } } } })
+  const partido = await prisma.partido.findUnique({ where: { id: partidoId }, select: { publicada: true, torneo: { select: { id: true, organizacionId: true } }, equipoLocalId: true, equipoVisitanteId: true, equipoLocal: { select: { privado: true } }, equipoVisitante: { select: { privado: true } } } })
   if (!partido) return false
+  if (esSuperadmin(auth)) return true
+  if (partido.torneo && esAdministradorTorneo(auth, partido.torneo)) return true
   if (partido.publicada && !partido.equipoLocal?.privado && !partido.equipoVisitante?.privado) return true
   for (const equipoId of [partido.equipoLocalId, partido.equipoVisitanteId]) {
     if (equipoId && await esMiembroEquipo(prisma, auth, equipoId)) return true
@@ -48,7 +49,19 @@ async function puedeVerPartido(prisma: ReturnType<typeof getPrisma>, auth: Retur
 }
 
 async function puedeVerEstadisticasJugador(prisma: ReturnType<typeof getPrisma>, auth: ReturnType<typeof getAuth>, jugadorId: string): Promise<boolean> {
-  return esSuperadmin(auth) || auth.jugadorId === jugadorId || (await esDelegadoDelJugador(prisma, auth, jugadorId))
+  if (esSuperadmin(auth) || auth.jugadorId === jugadorId || (await esDelegadoDelJugador(prisma, auth, jugadorId))) {
+    return true
+  }
+  const equipos = await prisma.equipoJugador.findMany({
+    where: { jugadorId, estado: { not: EstadoEquipoJugador.BAJA } },
+    select: { equipoId: true },
+  })
+  if (equipos.length === 0) return false
+  const participacion = await prisma.equipoParticipacion.findFirst({
+    where: { equipoId: { in: equipos.map((e) => e.equipoId) }, estado: { in: ['PENDIENTE', 'INSCRIPTO', 'CONFIRMADO'] } },
+    select: { torneo: { select: { organizacionId: true } } },
+  })
+  return participacion?.torneo.organizacionId ? esAdministradorOrganizacion(auth, participacion.torneo.organizacionId) : false
 }
 
 async function puedeVerCompetencia(prisma: ReturnType<typeof getPrisma>, auth: ReturnType<typeof getAuth>, torneoCategoriaId: string): Promise<boolean> {
@@ -202,11 +215,22 @@ export async function eventosPartidoRoutes(app: FastifyInstance): Promise<void> 
   })
   app.get('/partidos/:id/sanciones', { preHandler: requierePermiso(PERMISOS.estadisticasVer) }, async (request) => { const id = (request.params as { id: string }).id; const prisma = getPrisma(); if (!(await puedeVerPartido(prisma, getAuth(request), id))) throw prohibido('No tenés acceso a estas sanciones'); return { data: await prisma.sancion.findMany({ where: { partidoId: id }, orderBy: { createdAt: 'asc' } }) } })
   app.post('/sanciones', { preHandler: requierePermiso(PERMISOS.sancionesGestionar) }, async (request) => {
-    const auth = getAuth(request); const body = request.body as { equipoId: string; jugadorId?: string; partidoId?: string; torneoId?: string; origen: string; tipo: string; motivo: string; fechaInicio: string; fechaFin?: string }
+    const auth = getAuth(request); const prisma = getPrisma(); const body = request.body as { equipoId: string; jugadorId?: string; partidoId?: string; torneoId?: string; origen: string; tipo: string; motivo: string; fechaInicio: string; fechaFin?: string }
     if (!body.equipoId || !body.origen || !body.tipo || !body.motivo || !body.fechaInicio) throw badRequest('Datos de sanción incompletos')
-    if (!(await puedeEnEquipo(getPrisma(), auth, body.equipoId, 'DELEGADO')) && !(body.torneoId && await esAdminDeTorneo(getPrisma(), auth, body.torneoId))) throw prohibido('No tenés permiso para crear sanciones')
-    const sancion = await getPrisma().sancion.create({ data: { equipoId: body.equipoId, jugadorId: body.jugadorId ?? null, partidoId: body.partidoId ?? null, torneoId: body.torneoId ?? null, origen: body.origen as never, tipo: body.tipo as never, motivo: body.motivo.trim(), fechaInicio: new Date(body.fechaInicio), fechaFin: body.fechaFin ? new Date(body.fechaFin) : null } })
-    await auditar(getPrisma(), { entidad: 'Sancion', entidadId: sancion.id, accion: 'CREATE', usuarioId: auth.usuarioId, cambios: { equipoId: body.equipoId, partidoId: body.partidoId ?? null, tipo: body.tipo, origen: body.origen } })
+    const partido = body.partidoId ? await prisma.partido.findUnique({ where: { id: body.partidoId }, select: { torneoId: true, equipoLocalId: true, equipoVisitanteId: true } }) : null
+    if (body.partidoId && !partido) throw badRequest('El partido indicado no existe')
+    if (partido && ![partido.equipoLocalId, partido.equipoVisitanteId].includes(body.equipoId)) throw badRequest('El equipo no participa del partido indicado')
+    const torneoId = body.torneoId ?? partido?.torneoId ?? null
+    if (partido?.torneoId && body.torneoId && body.torneoId !== partido.torneoId) throw badRequest('El torneo indicado no coincide con el del partido')
+    if (torneoId && !(await prisma.equipoParticipacion.findFirst({ where: { torneoId, equipoId: body.equipoId }, select: { id: true } }))) throw badRequest('El equipo no participa del torneo indicado')
+    if (body.jugadorId) {
+      const pertenencia = await prisma.equipoJugador.findFirst({ where: { equipoId: body.equipoId, jugadorId: body.jugadorId, estado: { notIn: [EstadoEquipoJugador.BAJA, EstadoEquipoJugador.INVITADO] } }, select: { id: true } })
+      if (!pertenencia) throw badRequest('El jugador no pertenece al equipo de la sanción')
+    }
+    const autorizado = torneoId ? (await esAdminDeTorneo(prisma, auth, torneoId)) || (await puedeEnEquipo(prisma, auth, body.equipoId, 'DELEGADO')) : await puedeEnEquipo(prisma, auth, body.equipoId, 'DELEGADO')
+    if (!autorizado) throw prohibido('No tenés permiso para crear sanciones')
+    const sancion = await prisma.sancion.create({ data: { equipoId: body.equipoId, jugadorId: body.jugadorId ?? null, partidoId: body.partidoId ?? null, torneoId, origen: body.origen as never, tipo: body.tipo as never, motivo: body.motivo.trim(), fechaInicio: new Date(body.fechaInicio), fechaFin: body.fechaFin ? new Date(body.fechaFin) : null } })
+    await auditar(prisma, { entidad: 'Sancion', entidadId: sancion.id, accion: 'CREATE', usuarioId: auth.usuarioId, cambios: { equipoId: body.equipoId, partidoId: body.partidoId ?? null, tipo: body.tipo, origen: body.origen } })
     return { data: sancion }
   })
   app.patch('/sanciones/:id', { preHandler: requierePermiso(PERMISOS.sancionesGestionar) }, async (request) => {
@@ -214,7 +238,7 @@ export async function eventosPartidoRoutes(app: FastifyInstance): Promise<void> 
     if (!(await puedeEnEquipo(getPrisma(), auth, previo.equipoId, 'DELEGADO'))) throw prohibido('No tenés permiso para corregir sanciones')
     const body = request.body as { motivo?: string; fechaFin?: string; resuelta?: boolean }; const sancion = await getPrisma().sancion.update({ where: { id }, data: { motivo: body.motivo?.trim(), fechaFin: body.fechaFin ? new Date(body.fechaFin) : undefined, resuelta: body.resuelta } }); await auditar(getPrisma(), { entidad: 'Sancion', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { campos: Object.keys(body) } }); return { data: sancion }
   })
-  app.post('/sanciones/:id/resolver', { preHandler: requierePermiso(PERMISOS.sancionesGestionar) }, async (request) => { const auth = getAuth(request); const id = (request.params as { id: string }).id; const previa = await getPrisma().sancion.findUnique({ where: { id } }); if (!previa) throw noEncontrado('Sanción'); if (!esAdministrador(auth) && !(previa.torneoId && await esAdminDeTorneo(getPrisma(), auth, previa.torneoId))) throw prohibido('No tenés permiso para resolver sanciones'); const sancion = await getPrisma().sancion.update({ where: { id }, data: { resuelta: true } }); await auditar(getPrisma(), { entidad: 'Sancion', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { resuelta: true } }); return { data: sancion } })
+  app.post('/sanciones/:id/resolver', { preHandler: requierePermiso(PERMISOS.sancionesGestionar) }, async (request) => { const auth = getAuth(request); const id = (request.params as { id: string }).id; const previa = await getPrisma().sancion.findUnique({ where: { id } }); if (!previa) throw noEncontrado('Sanción'); if (previa.torneoId ? !(await esAdminDeTorneo(getPrisma(), auth, previa.torneoId)) : !esSuperadmin(auth)) throw prohibido('No tenés permiso para resolver sanciones'); const sancion = await getPrisma().sancion.update({ where: { id }, data: { resuelta: true } }); await auditar(getPrisma(), { entidad: 'Sancion', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { resuelta: true } }); return { data: sancion } })
 }
 
 export { validarGoles }

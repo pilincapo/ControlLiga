@@ -129,6 +129,13 @@ export async function puedeVerEquipo(
   if (esSuperadmin(contexto) || (await esMiembroEquipo(prisma, contexto, equipoId))) {
     return true
   }
+  const organzacionEquipo = await prisma.equipoParticipacion.findFirst({
+    where: { equipoId, estado: { in: ['PENDIENTE', 'INSCRIPTO', 'CONFIRMADO'] } },
+    select: { torneo: { select: { organizacionId: true } } },
+  })
+  if (organzacionEquipo?.torneo.organizacionId && esAdministradorOrganizacion(contexto, organzacionEquipo.torneo.organizacionId)) {
+    return true
+  }
   if (!contexto.jugadorId) {
     return false
   }

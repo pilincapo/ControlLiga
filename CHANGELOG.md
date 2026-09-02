@@ -4,6 +4,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
 
+### Seguridad
+
+- FASE 17 hardening minimo: el acceso a estadisticas y sanciones queda acotado al scope real del rol, sin bypasses por ser ADMINISTRADOR global.
+- `puedeVerPartido`, `puedeVerEquipo` y `puedeVerEstadisticasJugador` resuelven la organizacion por torneo/participacion y aplican `esAdministradorOrganizacion`/`esAdministradorTorneo`; el POST de sanciones valida coherencia equipo-partido-torneo-jugador y la resolucion queda scoped al torneo.
+
 ### Agregado
 
 - FASE 16C en desarrollo: series eliminatorias por llave con ida/vuelta, global derivado, alargue, penales, definición administrativa, tercer puesto y reglas por ronda.
