@@ -29,7 +29,6 @@ export default function EquipoPage() {
   const esSuper = usuario?.permisos.includes('*') ?? false
   const esDelegado = esSuper || rolEnEquipo === 'DELEGADO'
   const gestionaPlantel = esDelegado || rolEnEquipo === 'TECNICO'
-  const puedeVerCaja = esSuper || rolEnEquipo === 'DELEGADO' || rolEnEquipo === 'TECNICO'
 
   const recargar = useCallback(async () => {
     if (!id) return
@@ -91,7 +90,6 @@ export default function EquipoPage() {
     { clave: 'jugadores', titulo: 'Jugadores' },
     { clave: 'administradores', titulo: 'Administradores' },
     { clave: 'config', titulo: 'Configuración' },
-    ...(puedeVerCaja ? [{ clave: 'caja', titulo: 'Caja' }] : []),
     ...(esSuper || rolEnEquipo ? [{ clave: 'invitaciones', titulo: 'Invitaciones' }] : []),
   ]
 
@@ -136,12 +134,6 @@ export default function EquipoPage() {
           {f} (próximamente)
         </span>
       ))}
-
-      {puedeVerCaja && seccion !== 'caja' && (
-        <button className="boton" onClick={() => setSeccion('caja')}>
-          Abrir Caja
-        </button>
-      )}
 
       {seccion === 'plantel' && (
         <PlantelSection
@@ -191,10 +183,6 @@ export default function EquipoPage() {
         />
       )}
 
-      {seccion === 'caja' && (
-        <CajaSection equipoId={equipo.id} puedeAdministrar={esDelegado} plantel={plantel} />
-      )}
-
       {seccion === 'invitaciones' && (
         <InvitacionesSection
           equipoId={equipo.id}
@@ -203,158 +191,6 @@ export default function EquipoPage() {
         />
       )}
     </Layout>
-  )
-}
-
-function CajaSection({
-  equipoId,
-  puedeAdministrar,
-  plantel,
-}: {
-  equipoId: string
-  puedeAdministrar: boolean
-  plantel: JugadorPlantelEquipo[]
-}) {
-  const [caja, setCaja] = useState<{
-    resumen: {
-      saldoActual: number
-      totalPendiente: number
-      totalIngresosPagados: number
-      totalGastosPagados: number
-    }
-    movimientos: Array<{
-      id: string
-      tipo: string
-      concepto: string
-      importe: string
-      estado: string
-      fecha: string
-      jugadorId: string | null
-    }>
-  } | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [tipo, setTipo] = useState('INGRESO')
-  const [concepto, setConcepto] = useState('')
-  const [importe, setImporte] = useState('')
-  const [jugadorId, setJugadorId] = useState('')
-  const cargar = useCallback(async () => {
-    try {
-      setCaja(await apiFetch(`/equipos/${equipoId}/caja`))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cargar caja')
-    }
-  }, [equipoId])
-  useEffect(() => {
-    let activo = true
-    apiFetch<NonNullable<typeof caja>>(`/equipos/${equipoId}/caja`)
-      .then((data) => {
-        if (activo) setCaja(data)
-      })
-      .catch((err) => {
-        if (activo) setError(err instanceof Error ? err.message : 'No se pudo cargar caja')
-      })
-    return () => {
-      activo = false
-    }
-  }, [equipoId])
-  async function crear(e: FormEvent) {
-    e.preventDefault()
-    try {
-      await apiFetch(`/equipos/${equipoId}/caja`, {
-        method: 'POST',
-        body: JSON.stringify({
-          tipo,
-          categoria: tipo === 'INGRESO' ? 'CUOTA' : 'OTROS',
-          concepto,
-          importe: Number(importe),
-          jugadorId: jugadorId || undefined,
-        }),
-      })
-      setConcepto('')
-      setImporte('')
-      await cargar()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear movimiento')
-    }
-  }
-  async function estado(id: string, nuevo: string) {
-    try {
-      await apiFetch(`/movimientos-caja/${id}/estado`, {
-        method: 'PATCH',
-        body: JSON.stringify({ estado: nuevo }),
-      })
-      await cargar()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cambiar estado')
-    }
-  }
-  return (
-    <div className="tarjeta">
-      <h3>Caja privada</h3>
-      <p>Solo miembros autorizados ven importes, conceptos y movimientos.</p>
-      {error && <p className="error">{error}</p>}{' '}
-      {caja && (
-        <>
-          <p>
-            Saldo cobrado: <strong>{caja.resumen.saldoActual}</strong> · Pendiente:{' '}
-            <strong>{caja.resumen.totalPendiente}</strong> · Ingresos:{' '}
-            {caja.resumen.totalIngresosPagados} · Gastos: {caja.resumen.totalGastosPagados}
-          </p>
-          {puedeAdministrar && (
-            <form onSubmit={crear}>
-              <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-                <option>INGRESO</option>
-                <option>EGRESO</option>
-              </select>
-              <input
-                value={concepto}
-                onChange={(e) => setConcepto(e.target.value)}
-                placeholder="Concepto"
-                required
-              />
-              <input
-                value={importe}
-                onChange={(e) => setImporte(e.target.value)}
-                placeholder="Importe"
-                type="number"
-                min="0.01"
-                step="0.01"
-                required
-              />
-              <select value={jugadorId} onChange={(e) => setJugadorId(e.target.value)}>
-                <option value="">Sin jugador</option>
-                {plantel.map((j) => (
-                  <option key={j.jugadorId} value={j.jugadorId}>
-                    {j.nombre}
-                  </option>
-                ))}
-              </select>
-              <button className="boton boton-primario">Registrar</button>
-            </form>
-          )}
-          {
-            <ul className="lista">
-              {caja.movimientos.map((m) => (
-                <li key={m.id}>
-                  {new Date(m.fecha).toLocaleDateString()} · {m.tipo} · {m.concepto} · {m.importe} ·{' '}
-                  {m.estado}
-                  {puedeAdministrar && m.estado === 'PENDIENTE' && (
-                    <button className="boton" onClick={() => void estado(m.id, 'PAGADO')}>
-                      Marcar pago
-                    </button>
-                  )}
-                  {puedeAdministrar && m.estado !== 'ANULADO' && (
-                    <button className="boton" onClick={() => void estado(m.id, 'ANULADO')}>
-                      Anular
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          }
-        </>
-      )}
-    </div>
   )
 }
 

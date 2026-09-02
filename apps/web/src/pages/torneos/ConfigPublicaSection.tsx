@@ -57,7 +57,7 @@ export default function ConfigPublicaSection({ torneoId, configuracionPublica, v
           </label>
         </div>
         <p>
-          Marcá qué información se muestra públicamente. Nunca se exponen caja, pagos ni datos privados de los equipos.
+          Marcá qué información se muestra públicamente. Nunca se exponen datos privados de los equipos.
         </p>
       </div>
       <div className="tarjeta">

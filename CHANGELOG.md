@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
 
+### Caja retirada
+
+- Funciones financieras (Caja, cuotas/pagos del plantel, módulo de movimientos) retiradas del producto actual. Se eliminaron las rutas API de caja (`/equipos/:id/caja`, `/movimientos-caja/:id/estado` y de jugador), sus tests, los permisos `caja:ver`/`caja:administrar`, el acceso a Caja en `DashboardPage`, la sección Caja/cuotas-pagos de `EquipoPage` y «Mi caja» de `JugadorPage`.
+- La tabla `movimiento_caja` y sus migraciones/histórico se conservan intactas: no se borran datos ni se tocan migraciones; simplemente la app ya no expone financiero.
+- Roadmap y docs actualizados: no hay funcionalidad financiera (caja, cuotas/pagos, MercadoPago/gateways) en el horizonte actual.
+
 ### FASE 17
 
 - Operación de liga: organizaciones y torneos ahora publican slugs (`slug` único, autogenerado desde el nombre y editable vía `PATCH /organizaciones/:id` y torneos) y `zonaHoraria` con default `America/Argentina/Buenos_Aires`.

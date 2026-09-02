@@ -40,8 +40,6 @@ describe('portal público HTTP (FASE 11)', () => {
     [`/api/publico/equipos/${inexistente}`, 404],
     [`/api/publico/formaciones/${inexistente}`, 404],
     [`/api/publico/convocatorias/${inexistente}`, 404],
-    [`/api/publico/caja/${inexistente}`, 404],
-    ['/api/publico/caja', 404],
   ])('escenario %s respeta publicación y privacidad', async (url, esperado) => {
     const response = await app.inject({ method: 'GET', url })
     expect(response.statusCode).toBe(esperado)

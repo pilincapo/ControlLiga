@@ -80,18 +80,12 @@ describe('hardening FASE 14', () => {
     loginIpRateLimiter.limpiar()
   })
 
-  it('bloquea estadísticas y caja privadas de otro equipo', async () => {
+  it('bloquea estadísticas privadas de otro equipo', async () => {
     const estadisticas = await app.inject({
       method: 'GET',
       url: `/api/equipos/${equipoB.id}/estadisticas`,
       headers: conCookie(tokenDelegadoA),
     })
     expect(estadisticas.statusCode).toBe(403)
-    const caja = await app.inject({
-      method: 'GET',
-      url: `/api/jugadores/${jugadorB.id}/caja`,
-      headers: conCookie(tokenDelegadoA),
-    })
-    expect(caja.statusCode).toBe(403)
   })
 })

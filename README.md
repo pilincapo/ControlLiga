@@ -1,6 +1,6 @@
 # CONTROL LIGA
 
-Sistema de gestión de ligas de fútbol: torneos, equipos, jugadores, partidos, fixture, estadísticas y pagos.
+Sistema de gestión de ligas de fútbol: torneos, equipos, jugadores, partidos, fixture y estadísticas.
 
 > **Estado actual**: aplicación funcional hasta FASE 14, con hardening multi-tenant y preparación para beta controlada. Ver `docs/beta-readiness.md` antes de desplegar.
 

@@ -1,5 +1,7 @@
 # FASE 10 — Caja, pagos y gastos del equipo: diseño
 
+> **ESTADO: RETIRADA DEL PRODUCTO (histórico).** Este diseño sirvió de guía para el módulo Caja, que fue implementado y luego retirado del producto actual. Hoy **no hay funcionalidad financiera** (caja, cuotas/pagos del plantel, pagos, MercadoPago/gateways). La tabla `movimiento_caja` y sus migraciones/histórico se conservan intactas; la app ya no las expone. Este documento queda como registro histórico de diseño.
+
 Estado: **IMPLEMENTADO**. Base: FASE 9.
 
 ## 1. Objetivo
