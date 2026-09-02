@@ -185,7 +185,7 @@ export default function PartidoPage() {
 
   if (!partido)
     return (
-      <Layout>
+    <Layout>
         {error ? (
           <PageState tipo="error" detalle={error} onReintentar={() => void recargar()} />
         ) : (
@@ -195,7 +195,8 @@ export default function PartidoPage() {
     )
 
   return (
-    <Layout>
+      <Layout>
+        {partido?.llaveCompetencia && <section className="tarjeta"><strong>{partido.llaveCompetencia.rondaEliminatoria.nombre}</strong> · {partido.llaveCompetencia.rondaEliminatoria.formatoSerie === 'IDA_VUELTA' ? 'Serie ida/vuelta' : 'Partido único'} <StatusBadge valor={partido.llaveCompetencia.estado} />{partido.llaveCompetencia.partidos.map((serie) => <span key={serie.id}> · {serie.ordenSerie === 1 ? 'Ida' : 'Vuelta'} {serie.golesLocal ?? '-'}-{serie.golesVisitante ?? '-'}</span>)}{partido.llaveCompetencia.definicion?.tipo === 'PENALES' && ` · Penales ${partido.llaveCompetencia.definicion.penalesLocal}-${partido.llaveCompetencia.definicion.penalesVisitante}`}{partido.llaveCompetencia.definicion?.tipo === 'ADMINISTRATIVA' && ' · Definición administrativa'}</section>}
       <h2>
         {partido.equipoLocal?.nombre ?? '?'} vs {partido.equipoVisitante?.nombre ?? '?'}
       </h2>

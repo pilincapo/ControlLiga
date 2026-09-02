@@ -4,7 +4,7 @@ import { getPrisma } from '../db.js'
 import { auditar } from '../auth/auditoria.js'
 import { autenticar, getAuth, requierePermiso } from '../plugins/auth.js'
 import { esAdminDeTorneo, esDelegadoDelJugador, esMiembroEquipo, esSuperadmin, puedeEnEquipo, puedeVerEquipo, puedeVerTorneo } from '../auth/permisos.js'
-import { badRequest, noEncontrado, prohibido } from '../http.js'
+import { badRequest, conflicto, noEncontrado, prohibido } from '../http.js'
 import { EstadoEquipoJugador, EstadoPartido, TipoEventoPartido } from '../generated/prisma/enums.js'
 
 interface EventoBody {
@@ -20,6 +20,10 @@ interface EventoBody {
 }
 
 const estadosInvalidosParaGestion: EstadoPartido[] = [EstadoPartido.FINALIZADO]
+
+function bloquearCorreccionDeLlaveResuelta(partido: { llaveCompetencia: { estado: string } | null } | null): void {
+  if (partido?.llaveCompetencia?.estado === 'RESUELTA') throw conflicto('llave_resuelta', 'Corrección bloqueada: primero invalidá la resolución de la llave')
+}
 
 async function puedeGestionarEvento(prisma: ReturnType<typeof getPrisma>, auth: ReturnType<typeof getAuth>, partido: { tipo: string; torneoId: string | null; equipoResponsableId: string | null; equipoLocalId: string | null; equipoVisitanteId: string | null }, equipoId: string) {
   if (esSuperadmin(auth)) return true
@@ -53,7 +57,7 @@ async function puedeVerCompetencia(prisma: ReturnType<typeof getPrisma>, auth: R
 }
 
 async function cargarContexto(prisma: ReturnType<typeof getPrisma>, id: string) {
-  const partido = await prisma.partido.findUnique({ where: { id }, include: { formacionInstancias: { include: { jugadores: true } } } })
+  const partido = await prisma.partido.findUnique({ where: { id }, include: { formacionInstancias: { include: { jugadores: true } }, llaveCompetencia: { select: { estado: true } } } })
   if (!partido) throw noEncontrado('Partido')
   return partido
 }
@@ -64,6 +68,7 @@ async function validarEvento(prisma: ReturnType<typeof getPrisma>, partido: Awai
   if (body.minuto !== undefined && (!Number.isInteger(body.minuto) || body.minuto < 0)) throw badRequest('El minuto debe ser entero no negativo')
   if (body.tipo === 'SUSTITUCION' && (body.minuto === undefined || !body.periodo?.trim())) throw badRequest('La sustitución requiere minuto y período')
   if (body.tipo === 'GOL' && !body.jugadorId) throw badRequest('El gol requiere jugador')
+  if (body.tipo === 'GOL' && body.periodo && !['PRIMER_TIEMPO', 'SEGUNDO_TIEMPO', 'ALARGUE_PRIMER_TIEMPO', 'ALARGUE_SEGUNDO_TIEMPO'].includes(body.periodo)) throw badRequest('Período de gol inválido')
   if (body.tipo === 'TARJETA' && (!body.jugadorId || !['AMARILLA', 'ROJA'].includes(body.subtipo ?? ''))) throw badRequest('La tarjeta requiere jugador y subtipo AMARILLA o ROJA')
   if (body.tipo === 'ASISTENCIA' && (!body.jugadorId || !body.jugadorRelacionadoId)) throw badRequest('La asistencia requiere jugador y jugador relacionado')
   if (body.tipo === 'SUSTITUCION' && (!body.jugadorId || !body.jugadorRelacionadoId || body.jugadorId === body.jugadorRelacionadoId)) throw badRequest('La sustitución requiere jugador que sale y jugador que entra')
@@ -123,6 +128,7 @@ export async function eventosPartidoRoutes(app: FastifyInstance): Promise<void> 
 
   app.post('/partidos/:id/eventos', { preHandler: requierePermiso(PERMISOS.partidosCargarResultados) }, async (request) => {
     const auth = getAuth(request); const prisma = getPrisma(); const partido = await cargarContexto(prisma, (request.params as { id: string }).id); const body = request.body as EventoBody
+    bloquearCorreccionDeLlaveResuelta(partido)
     if (estadosInvalidosParaGestion.includes(partido.estado)) throw badRequest('Partido finalizado: usar corrección administrativa')
     if (!(await puedeGestionarEvento(prisma, auth, partido, body.equipoId))) throw prohibido('No tenés permiso para cargar eventos en ese equipo')
     await validarEvento(prisma, partido, body)
@@ -132,8 +138,9 @@ export async function eventosPartidoRoutes(app: FastifyInstance): Promise<void> 
   })
 
   app.patch('/eventos-partido/:id', { preHandler: requierePermiso(PERMISOS.partidosCargarResultados) }, async (request) => {
-    const auth = getAuth(request); const prisma = getPrisma(); const id = (request.params as { id: string }).id; const previo = await prisma.eventoPartido.findUnique({ where: { id }, include: { partido: { include: { formacionInstancias: { include: { jugadores: true } } } } } }); if (!previo) throw noEncontrado('Evento')
+    const auth = getAuth(request); const prisma = getPrisma(); const id = (request.params as { id: string }).id; const previo = await prisma.eventoPartido.findUnique({ where: { id }, include: { partido: { include: { formacionInstancias: { include: { jugadores: true } }, llaveCompetencia: { select: { estado: true } } } } } }); if (!previo) throw noEncontrado('Evento')
     if (previo.partido.estado === EstadoPartido.FINALIZADO && !esAdministrador(auth)) throw badRequest('Partido finalizado: solo permite corrección administrativa')
+    bloquearCorreccionDeLlaveResuelta(previo.partido)
     if (!(await puedeGestionarEvento(prisma, auth, previo.partido, previo.equipoId))) throw prohibido('No tenés permiso para corregir este evento')
     const body = { equipoId: previo.equipoId, jugadorId: previo.jugadorId ?? undefined, jugadorRelacionadoId: previo.jugadorRelacionadoId ?? undefined, tipo: previo.tipo, minuto: previo.minuto ?? undefined, periodo: previo.periodo ?? undefined, orden: previo.orden, subtipo: previo.subtipo ?? undefined, observaciones: previo.observaciones ?? undefined, ...(request.body as Partial<EventoBody>) }
     await validarEvento(prisma, previo.partido, body, id)
@@ -142,8 +149,9 @@ export async function eventosPartidoRoutes(app: FastifyInstance): Promise<void> 
   })
 
   app.post('/eventos-partido/:id/anular', { preHandler: requierePermiso(PERMISOS.partidosCargarResultados) }, async (request) => {
-    const auth = getAuth(request); const prisma = getPrisma(); const id = (request.params as { id: string }).id; const evento = await prisma.eventoPartido.findUnique({ where: { id }, include: { partido: true } }); if (!evento) throw noEncontrado('Evento')
+    const auth = getAuth(request); const prisma = getPrisma(); const id = (request.params as { id: string }).id; const evento = await prisma.eventoPartido.findUnique({ where: { id }, include: { partido: { include: { llaveCompetencia: { select: { estado: true } } } } } }); if (!evento) throw noEncontrado('Evento')
     if (evento.partido.estado === EstadoPartido.FINALIZADO && !esAdministrador(auth)) throw badRequest('Partido finalizado: solo permite corrección administrativa')
+    bloquearCorreccionDeLlaveResuelta(evento.partido)
     if (!(await puedeGestionarEvento(prisma, auth, evento.partido, evento.equipoId))) throw prohibido('No tenés permiso para anular este evento')
     const actualizado = await prisma.$transaction(async (tx) => { const r = await tx.eventoPartido.update({ where: { id }, data: { anulado: true } }); await auditar(tx, { entidad: 'EventoPartido', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { anulado: true } }); return r }); return { data: actualizado }
   })

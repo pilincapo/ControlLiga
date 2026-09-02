@@ -6,6 +6,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ### Agregado
 
+- FASE 16C en desarrollo: series eliminatorias por llave con ida/vuelta, global derivado, alargue, penales, definición administrativa, tercer puesto y reglas por ronda.
 - Cobertura HTTP/integración FASE 16B para clasificación de grupos y LIGA, snapshots, idempotencia, invalidación, mejores terceros, RBAC y privacidad pública.
 - FASE 16B backend: reglas de clasificación, clasificados y participantes por fase, transición trazable con seeds y FK restrictivas para llaves.
 - FASE 16B: clasificación transaccional ahora materializa participantes y genera eliminación destino con slots de participante-fase; tablas y partidos quedan limitados a fase origen, incluyendo LIGA.
@@ -16,6 +17,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ### Documentación
 
+- Diseño de FASE 16C aprobado para implementación; trabajo local en desarrollo, aún no cerrado.
 - Diseño propuesto de FASE 16 para competencia avanzada, con recomendación de dividir grupos/eliminación, clasificación y series ida/vuelta en entregas compatibles con historial.
 - Diseño de FASE 16B para clasificación automática, transiciones entre fases, snapshots, trazabilidad y bloqueo histórico.
 

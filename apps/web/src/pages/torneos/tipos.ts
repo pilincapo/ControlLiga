@@ -104,6 +104,10 @@ export interface FaseCompetencia {
   rondas: Array<{
     id: string
     nombre: string
+    tipo?: string
+    formatoSerie?: string
+    permiteAlargue?: boolean
+    permitePenales?: boolean
     llaves: Array<{
       id: string
       orden: number
@@ -111,6 +115,8 @@ export interface FaseCompetencia {
       participacionLocal: { equipo: { nombre: string } } | null
       participacionVisitante: { equipo: { nombre: string } } | null
       ganadorParticipacion: { equipo: { nombre: string } } | null
+      definicion?: { tipo: string; penalesLocal: number | null; penalesVisitante: number | null } | null
+      partidos?: Array<{ id: string; ordenSerie: number | null; estado: string; golesLocal: number | null; golesVisitante: number | null }>
     }>
   }>
 }

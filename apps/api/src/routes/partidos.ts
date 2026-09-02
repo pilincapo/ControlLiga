@@ -43,6 +43,8 @@ interface CambiarEstadoBody {
 interface GolesBody {
   golesLocal: number
   golesVisitante: number
+  golesLocalReglamentario?: number
+  golesVisitanteReglamentario?: number
 }
 
 async function validarPartidoTorneo(
@@ -174,6 +176,7 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
         sanciones: { select: { id: true, tipo: true, motivo: true, jugadorId: true } },
         torneo: { select: { id: true, nombre: true } },
         temporada: { select: { id: true, nombre: true } },
+        llaveCompetencia: { include: { definicion: true, partidos: { select: { id: true, ordenSerie: true, golesLocal: true, golesVisitante: true, estado: true }, orderBy: { ordenSerie: 'asc' } }, rondaEliminatoria: true } },
       },
     })
     if (!partido) throw noEncontrado('Partido')
@@ -251,12 +254,23 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
     if (body.golesLocal == null || body.golesVisitante == null || body.golesLocal < 0 || body.golesVisitante < 0 || !Number.isInteger(body.golesLocal) || !Number.isInteger(body.golesVisitante)) {
       throw badRequest('Los goles deben ser números enteros no negativos')
     }
-    const p = await prisma.partido.findUnique({ where: { id }, select: { id: true, estado: true, tipo: true, torneoId: true, equipoResponsableId: true, equipoLocalId: true } })
+    const p = await prisma.partido.findUnique({ where: { id }, select: { id: true, estado: true, tipo: true, torneoId: true, equipoResponsableId: true, equipoLocalId: true, ordenSerie: true, llaveCompetencia: { select: { id: true, rondaEliminatoria: { select: { permiteAlargue: true, formatoSerie: true } }, partidos: { select: { id: true, ordenSerie: true, golesLocal: true, golesVisitante: true }, orderBy: { ordenSerie: 'asc' } } } } } })
     if (!p) throw noEncontrado('Partido')
     if (p.estado === 'FINALIZADO') throw badRequest('El partido ya está finalizado')
     if (!(await puedeGestionar(prisma, auth, p))) throw prohibido('No tenés permiso para cargar el resultado')
     const nuevoEstado = p.estado === 'EN_CURSO' ? 'FINALIZADO' : undefined
-    const data: Record<string, unknown> = { golesLocal: body.golesLocal, golesVisitante: body.golesVisitante }
+    const reglamentario = body.golesLocalReglamentario !== undefined || body.golesVisitanteReglamentario !== undefined
+    const esIdaDeSerie = p.llaveCompetencia?.rondaEliminatoria.formatoSerie === 'IDA_VUELTA' && p.ordenSerie === 1
+    if (reglamentario) {
+      if (esIdaDeSerie || !p.llaveCompetencia?.rondaEliminatoria.permiteAlargue || !Number.isInteger(body.golesLocalReglamentario) || !Number.isInteger(body.golesVisitanteReglamentario) || body.golesLocalReglamentario! < 0 || body.golesVisitanteReglamentario! < 0 || body.golesLocalReglamentario! > body.golesLocal || body.golesVisitanteReglamentario! > body.golesVisitante) throw badRequest('Resultado de alargue inválido para este partido')
+      const formato = p.llaveCompetencia?.rondaEliminatoria.formatoSerie
+      if (formato === 'PARTIDO_UNICO' && body.golesLocalReglamentario !== body.golesVisitanteReglamentario) throw badRequest('Resultado de alargue inválido para este partido')
+      if (!esIdaDeSerie && formato === 'IDA_VUELTA') {
+        const ida = p.llaveCompetencia!.partidos.find((partido) => partido.ordenSerie === 1)
+        if (ida && ida.golesLocal !== null && ida.golesVisitante !== null && ida.golesLocal + body.golesVisitanteReglamentario! !== ida.golesVisitante + body.golesLocalReglamentario!) throw badRequest('Resultado de alargue inválido para este partido')
+      }
+    }
+    const data: Record<string, unknown> = { golesLocal: body.golesLocal, golesVisitante: body.golesVisitante, ...(reglamentario ? { golesLocalReglamentario: body.golesLocalReglamentario, golesVisitanteReglamentario: body.golesVisitanteReglamentario } : {}) }
     if (nuevoEstado) {
       if (!(await validarGoles(prisma, p.id, body.golesLocal, body.golesVisitante))) throw badRequest('Los goles oficiales no coinciden con eventos GOL no anulados')
       data.estado = nuevoEstado

@@ -100,7 +100,25 @@ enum TipoOrigenLlave {
 
 enum MetodoResolucionLlave {
   RESULTADO_PARTIDO
+  RESULTADO_GLOBAL
+  ALARGUE
+  PENALES
   BYE
+  ADMINISTRATIVA
+}
+
+enum FormatoSerieEliminatoria {
+  PARTIDO_UNICO
+  IDA_VUELTA
+}
+
+enum TipoRondaEliminatoria {
+  PRINCIPAL
+  TERCER_PUESTO
+}
+
+enum TipoDefinicionLlave {
+  PENALES
   ADMINISTRATIVA
 }
 
@@ -268,6 +286,7 @@ model Usuario {
   convocatoriasCreadas   Convocatoria[]   @relation("ConvocatoriaCreador")
   movimientosCajaCreados MovimientoCaja[] @relation("CajaCreador")
   eventosPartidoCreados EventoPartido[] @relation("EventoPartidoCreador")
+  definicionesLlaveCreadas DefinicionLlave[] @relation("DefinicionLlaveCreador")
   auditoriaLogs          AuditoriaLog[]
   sesiones               Session[]
   passwordResetTokens    PasswordResetToken[]
@@ -570,6 +589,9 @@ model EquipoParticipacion {
   llavesLocal       LlaveCompetencia[]   @relation("LlaveLocal")
   llavesVisitante   LlaveCompetencia[]   @relation("LlaveVisitante")
   llavesGanadas     LlaveCompetencia[]   @relation("LlaveGanador")
+  definicionesLlaveLocal DefinicionLlave[] @relation("DefinicionLlaveLocal")
+  definicionesLlaveVisitante DefinicionLlave[] @relation("DefinicionLlaveVisitante")
+  definicionesLlaveGanadas DefinicionLlave[] @relation("DefinicionLlaveGanador")
   createdAt         DateTime            @default(now())
 
   @@index([equipoId, torneoId, temporadaId])
@@ -728,12 +750,19 @@ model RondaEliminatoria {
   faseCompetencia   FaseCompetencia     @relation(fields: [faseCompetenciaId], references: [id], onDelete: Restrict)
   orden             Int
   nombre            String
+  tipo              TipoRondaEliminatoria @default(PRINCIPAL)
+  formatoSerie      FormatoSerieEliminatoria @default(PARTIDO_UNICO)
+  permiteAlargue    Boolean               @default(false)
+  permitePenales    Boolean               @default(false)
+  configuracionSnapshot Json?
+  reglasCongeladasEn DateTime?
   llaves            LlaveCompetencia[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
   @@unique([faseCompetenciaId, orden])
   @@index([faseCompetenciaId])
+  @@index([faseCompetenciaId, tipo])
   @@map("rondas_eliminatorias")
 }
 
@@ -761,20 +790,26 @@ model LlaveCompetencia {
   llaveSiguienteId         String?                @db.Uuid
   llaveSiguiente           LlaveCompetencia?      @relation("LlaveSiguiente", fields: [llaveSiguienteId], references: [id], onDelete: Restrict)
   ladoSiguiente            String?
+  llavePerdedorSiguienteId String?                @db.Uuid
+  llavePerdedorSiguiente   LlaveCompetencia?      @relation("LlavePerdedorSiguiente", fields: [llavePerdedorSiguienteId], references: [id], onDelete: Restrict)
+  ladoPerdedorSiguiente    String?
   ganadorParticipacionId   String?                @db.Uuid
   ganadorParticipacion     EquipoParticipacion?   @relation("LlaveGanador", fields: [ganadorParticipacionId], references: [id], onDelete: Restrict)
   estado                   EstadoLlaveCompetencia @default(PENDIENTE_PARTICIPANTES)
   metodoResolucion         MetodoResolucionLlave?
   partidos                 Partido[]
+  definicion               DefinicionLlave?
   origenLocalDe            LlaveCompetencia[]     @relation("OrigenLocal")
   origenVisitanteDe        LlaveCompetencia[]     @relation("OrigenVisitante")
   anteriores               LlaveCompetencia[]     @relation("LlaveSiguiente")
+  anterioresPerdedor       LlaveCompetencia[]     @relation("LlavePerdedorSiguiente")
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
 
   @@unique([rondaEliminatoriaId, orden])
   @@index([rondaEliminatoriaId, estado])
   @@index([llaveSiguienteId])
+  @@index([llavePerdedorSiguienteId])
   @@index([participacionLocalId])
   @@index([participacionVisitanteId])
   @@index([participanteFaseLocalId])
@@ -849,6 +884,9 @@ model Partido {
   arbitro             String?
   golesLocal          Int?
   golesVisitante      Int?
+  ordenSerie          Int?
+  golesLocalReglamentario Int?
+  golesVisitanteReglamentario Int?
   observaciones       String?
   convocatorias       Convocatoria[]
   formaciones         Formacion[]
@@ -866,7 +904,34 @@ model Partido {
   @@index([jornadaId])
   @@index([equipoResponsableId, tipo])
   @@index([llaveCompetenciaId])
+  @@unique([llaveCompetenciaId, ordenSerie])
+  @@index([llaveCompetenciaId, ordenSerie])
   @@map("partidos")
+}
+
+model DefinicionLlave {
+  id                      String              @id @default(uuid()) @db.Uuid
+  llaveCompetenciaId       String              @unique @db.Uuid
+  llaveCompetencia         LlaveCompetencia    @relation(fields: [llaveCompetenciaId], references: [id], onDelete: Restrict)
+  tipo                    TipoDefinicionLlave
+  participacionLocalId     String              @db.Uuid
+  participacionLocal       EquipoParticipacion @relation("DefinicionLlaveLocal", fields: [participacionLocalId], references: [id], onDelete: Restrict)
+  participacionVisitanteId String              @db.Uuid
+  participacionVisitante   EquipoParticipacion @relation("DefinicionLlaveVisitante", fields: [participacionVisitanteId], references: [id], onDelete: Restrict)
+  penalesLocal             Int?
+  penalesVisitante         Int?
+  ganadorParticipacionId   String              @db.Uuid
+  ganadorParticipacion     EquipoParticipacion @relation("DefinicionLlaveGanador", fields: [ganadorParticipacionId], references: [id], onDelete: Restrict)
+  motivo                   String?
+  creadoPorId              String              @db.Uuid
+  creadoPor                Usuario             @relation("DefinicionLlaveCreador", fields: [creadoPorId], references: [id], onDelete: Restrict)
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+
+  @@index([participacionLocalId])
+  @@index([participacionVisitanteId])
+  @@index([ganadorParticipacionId])
+  @@map("definiciones_llave")
 }
 
 model EventoPartido {

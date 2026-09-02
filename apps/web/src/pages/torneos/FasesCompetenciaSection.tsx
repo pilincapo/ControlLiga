@@ -37,6 +37,10 @@ export default function FasesCompetenciaSection({ competicionId, participaciones
   const [posicionDesde, setPosicionDesde] = useState(1)
   const [posicionHasta, setPosicionHasta] = useState(1)
   const [cantidad, setCantidad] = useState(1)
+  const [formatoSerie, setFormatoSerie] = useState<'PARTIDO_UNICO' | 'IDA_VUELTA'>('PARTIDO_UNICO')
+  const [permiteAlargue, setPermiteAlargue] = useState(false)
+  const [permitePenales, setPermitePenales] = useState(true)
+  const [tercerPuesto, setTercerPuesto] = useState(false)
   const [seedInicio, setSeedInicio] = useState(1)
   const [seedTipo, setSeedTipo] = useState<'ORDEN_CLASIFICACION' | 'CRUCE_EXPLICITO'>('ORDEN_CLASIFICACION')
   const [preview, setPreview] = useState<{ faseId: string; candidatos: PreviewClasificacion['candidatos'] } | null>(null)
@@ -101,7 +105,8 @@ export default function FasesCompetenciaSection({ competicionId, participaciones
             }
           : {
               tipo: 'ELIMINACION_DIRECTA', orden, nombre: `Eliminación directa ${orden}`, confirmar: true,
-               seeds: seedsActuales.map((participacionId, indice) => ({ participacionId, seed: indice + 1 })),
+                seeds: seedsActuales.map((participacionId, indice) => ({ participacionId, seed: indice + 1 })),
+                configuracion: { rondas: [{ orden: 1, formatoSerie, permiteAlargue, permitePenales }], tercerPuesto },
             }
         await apiFetch(`/torneo-categorias/${competicionId}/fases/generar`, { method: 'POST', body: JSON.stringify(body) })
         setToast('Fase generada')
@@ -181,14 +186,18 @@ export default function FasesCompetenciaSection({ competicionId, participaciones
               </div>
             ))}
           </>
-        ) : (
+        ) : (<>
           <ol className="lista">
             {seedsActuales.map((id, indice) => {
               const participacion = confirmadas.find((item) => item.id === id)
               return <li key={id}>Seed {indice + 1}: <strong>{participacion?.equipo.nombre}</strong> <button className="boton" disabled={indice === 0} onClick={() => moverSeed(indice, -1)}>Subir</button> <button className="boton" disabled={indice === seedsActuales.length - 1} onClick={() => moverSeed(indice, 1)}>Bajar</button></li>
             })}
           </ol>
-        )}
+          <div className="campo"><label htmlFor="formato-serie">Formato de serie</label><select id="formato-serie" value={formatoSerie} onChange={(e) => setFormatoSerie(e.target.value as typeof formatoSerie)}><option value="PARTIDO_UNICO">Partido único</option><option value="IDA_VUELTA">Ida y vuelta</option></select></div>
+          <label><input type="checkbox" checked={permiteAlargue} onChange={(e) => setPermiteAlargue(e.target.checked)} /> Permite alargue</label>
+          <label><input type="checkbox" checked={permitePenales} onChange={(e) => setPermitePenales(e.target.checked)} /> Permite penales</label>
+          <label><input type="checkbox" checked={tercerPuesto} onChange={(e) => setTercerPuesto(e.target.checked)} /> Generar tercer puesto</label>
+        </>)}
         {confirmadas.length === 0 ? <PageState tipo="vacio" detalle="Esta competencia no tiene participaciones confirmadas." /> : tipo === 'GRUPOS' && elegiblesParaGrupos.length === 0 ? <PageState tipo="vacio" detalle="Todas las participaciones confirmadas ya pertenecen a un grupo." /> : <>
           {tipo === 'GRUPOS' && !gruposValidos && <p className="error">Cada grupo requiere al menos dos participaciones.</p>}
           {tipo === 'ELIMINACION_DIRECTA' && !eliminacionValida && <p className="error">La eliminación directa requiere entre cuatro y dieciséis seeds.</p>}
@@ -219,7 +228,7 @@ export default function FasesCompetenciaSection({ competicionId, participaciones
           {fase.grupos.map((grupo) => <p key={grupo.id}><strong>Grupo {grupo.nombre}:</strong> {grupo.participaciones.map((p) => p.equipo.nombre).join(', ')}</p>)}
           {(fase.participantesFase?.length ?? 0) > 0 && <section><h5>Participantes clasificados</h5><ul className="lista">{fase.participantesFase.map((participante) => <li key={participante.id}><strong>{participante.participacion.equipo.nombre}</strong>{participante.seed !== null && ` · Seed ${participante.seed}`}{participante.clasificadoOrigen && ` · ${participante.clasificadoOrigen.etiquetaOrigen}`}</li>)}</ul></section>}
           {(fase.reglasClasificacionOrigen?.length ?? 0) > 0 && <section><h5>Reglas de clasificación</h5><ul className="lista">{fase.reglasClasificacionOrigen.map((regla) => <li key={regla.id}>{regla.tipo.replaceAll('_', ' ').toLowerCase()} · posiciones {regla.posicionDesde}-{regla.posicionHasta}{regla.cantidad && ` · ${regla.cantidad} cupos`} · destino: {fases?.find((destino) => destino.id === regla.faseDestinoId)?.nombre ?? 'Fase destino'} · seed {regla.seedInicio} <StatusBadge valor={regla.estado} />{regla.clasificados.length > 0 && <ul>{regla.clasificados.map((clasificado) => <li key={clasificado.id}>{confirmadas.find((p) => p.id === clasificado.participacionId)?.equipo.nombre ?? 'Participante'} · {clasificado.etiquetaOrigen} · Seed {clasificado.seed}</li>)}</ul>}</li>)}</ul></section>}
-          {fase.rondas.map((ronda) => <section key={ronda.id}><h5>{ronda.nombre}</h5><ul className="lista">{ronda.llaves.map((llave) => <li key={llave.id}><strong>{llave.participacionLocal?.equipo.nombre ?? 'A definir'}</strong>{llave.estado === 'BYE' ? ' — BYE' : <> vs <strong>{llave.participacionVisitante?.equipo.nombre ?? 'A definir'}</strong></>} <StatusBadge valor={llave.estado} />{llave.ganadorParticipacion && ` Ganador: ${llave.ganadorParticipacion.equipo.nombre}`}</li>)}</ul></section>)}
+           {fase.rondas.map((ronda) => <section key={ronda.id}><h5>{ronda.nombre} {ronda.formatoSerie && <StatusBadge valor={ronda.formatoSerie} />}</h5><ul className="lista">{ronda.llaves.map((llave) => <li key={llave.id}><strong>{llave.participacionLocal?.equipo.nombre ?? 'A definir'}</strong>{llave.estado === 'BYE' ? ' — BYE' : <> vs <strong>{llave.participacionVisitante?.equipo.nombre ?? 'A definir'}</strong></>} <StatusBadge valor={llave.estado} />{llave.partidos?.map((partido) => <span key={partido.id}> · {partido.ordenSerie === 1 ? 'Ida' : 'Vuelta'}: {partido.golesLocal ?? '-'}-{partido.golesVisitante ?? '-'}</span>)}{llave.definicion?.tipo === 'PENALES' && ` · Penales ${llave.definicion.penalesLocal}-${llave.definicion.penalesVisitante}`}{llave.definicion?.tipo === 'ADMINISTRATIVA' && ' · Definición administrativa'}{llave.ganadorParticipacion && ` Ganador: ${llave.ganadorParticipacion.equipo.nombre}`}</li>)}</ul></section>)}
           {preview?.faseId === fase.id && <section><h5>Vista previa</h5>{preview.candidatos.length === 0 ? <PageState tipo="vacio" detalle="No hay clasificados para las reglas actuales." /> : <ul className="lista">{preview.candidatos.map((candidato) => <li key={`${candidato.participacionId}-${candidato.seed}`}>{confirmadas.find((p) => p.id === candidato.participacionId)?.equipo.nombre ?? 'Participante'} · {candidato.etiquetaOrigen} · Seed {candidato.seed}</li>)}</ul>}</section>}
           <PermissionGate permitido={permitido}><div className="acciones"><button className="boton" onClick={() => void cargarPreview(fase.id)}>Previsualizar clasificación</button><button className="boton boton-primario" disabled={(fase.reglasClasificacionOrigen?.length ?? 0) === 0} onClick={() => setOperacion({ tipo: 'clasificar', faseId: fase.id })}>Confirmar clasificación</button><button className="boton boton-peligro" onClick={() => setOperacion({ tipo: 'invalidar', faseId: fase.id })}>Invalidar clasificación</button><button className="boton" onClick={() => setOperacion({ tipo: 'regenerar', faseId: fase.id })}>Regenerar fase</button></div></PermissionGate>
         </article>

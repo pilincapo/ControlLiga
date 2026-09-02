@@ -80,16 +80,19 @@ describe('competencia avanzada HTTP (FASE 16A)', () => {
   }
 
   async function finalizar(partidoId: string, golesLocal: number, golesVisitante: number) {
-    expect(
-      (
-        await app.inject({
-          method: 'POST',
-          url: `/api/partidos/${partidoId}/estado`,
-          payload: { estado: 'EN_CURSO' },
-          ...headers(tokenAdmin),
-        })
-      ).statusCode,
-    ).toBe(200)
+    const actual = await getPrisma().partido.findUnique({ where: { id: partidoId }, select: { estado: true } })
+    if (actual?.estado !== 'EN_CURSO') {
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `/api/partidos/${partidoId}/estado`,
+            payload: { estado: 'EN_CURSO' },
+            ...headers(tokenAdmin),
+          })
+        ).statusCode,
+      ).toBe(200)
+    }
     const partido = await getPrisma().partido.findUniqueOrThrow({
       where: { id: partidoId },
       select: { equipoLocalId: true, equipoVisitanteId: true },
@@ -1200,5 +1203,124 @@ describe('competencia avanzada HTTP (FASE 16A)', () => {
     })
     expect(invalidar.statusCode).toBe(409)
     expect(invalidar.json().error.code).toBe('fase_destino_historica')
+  })
+
+  it('FASE 16C crea ida/vuelta, deriva global y resuelve penales sin goles ficticios', async () => {
+    const competencia = await crearCompetencia('Serie 16C')
+    const crear = await app.inject({ method: 'POST', url: `/api/torneo-categorias/${competencia.id}/fases/eliminacion`, payload: { orden: 1, nombre: 'Playoffs', seeds: competencia.participaciones.map((participacionId, i) => ({ participacionId, seed: i + 1 })), configuracion: { rondas: [{ orden: 1, formatoSerie: 'IDA_VUELTA', permitePenales: true }] } }, ...headers(tokenAdmin) })
+    expect(crear.statusCode).toBe(200)
+    const faseId = crear.json().data.id as string
+    expect((await app.inject({ method: 'POST', url: `/api/fases-competencia/${faseId}/generar`, payload: { confirmar: true }, ...headers(tokenAdmin) })).statusCode).toBe(200)
+    const llave = await getPrisma().llaveCompetencia.findFirstOrThrow({ where: { rondaEliminatoria: { faseCompetenciaId: faseId }, partidos: { some: {} } }, include: { partidos: { orderBy: { ordenSerie: 'asc' } } } })
+    expect(llave.partidos).toHaveLength(2)
+    expect(llave.partidos[0]!.equipoLocalId).toBe(llave.partidos[1]!.equipoVisitanteId)
+    expect((await finalizar(llave.partidos[0]!.id, 2, 1)).statusCode).toBe(200)
+    expect((await getPrisma().llaveCompetencia.findUniqueOrThrow({ where: { id: llave.id } })).estado).toBe('PROGRAMADA')
+    expect((await finalizar(llave.partidos[1]!.id, 1, 0)).statusCode).toBe(200)
+    expect((await getPrisma().llaveCompetencia.findUniqueOrThrow({ where: { id: llave.id } })).estado).toBe('PENDIENTE_DEFINICION')
+    const penales = await app.inject({ method: 'POST', url: `/api/llaves-competencia/${llave.id}/definicion/penales`, payload: { confirmar: true, penalesLocal: 4, penalesVisitante: 3 }, ...headers(tokenAdmin) })
+    expect(penales.statusCode).toBe(200)
+    const resuelta = await getPrisma().llaveCompetencia.findUniqueOrThrow({ where: { id: llave.id }, include: { definicion: true } })
+    expect(resuelta).toMatchObject({ estado: 'RESUELTA', metodoResolucion: 'PENALES' })
+    expect(resuelta.definicion).toMatchObject({ penalesLocal: 4, penalesVisitante: 3 })
+  })
+
+  it('FASE 16C rechaza alargue en ida y lo acepta solo en vuelta o partido único', async () => {
+    const competencia = await crearCompetencia('Alargue 16C')
+    const crear = await app.inject({ method: 'POST', url: `/api/torneo-categorias/${competencia.id}/fases/eliminacion`, payload: { orden: 1, nombre: 'Playoffs', seeds: competencia.participaciones.map((participacionId, i) => ({ participacionId, seed: i + 1 })), configuracion: { rondas: [{ orden: 1, formatoSerie: 'IDA_VUELTA', permiteAlargue: true, permitePenales: true }] } }, ...headers(tokenAdmin) })
+    expect(crear.statusCode).toBe(200)
+    const faseId = crear.json().data.id as string
+    expect((await app.inject({ method: 'POST', url: `/api/fases-competencia/${faseId}/generar`, payload: { confirmar: true }, ...headers(tokenAdmin) })).statusCode).toBe(200)
+    const llave = await getPrisma().llaveCompetencia.findFirstOrThrow({ where: { rondaEliminatoria: { faseCompetenciaId: faseId }, partidos: { some: {} } }, include: { partidos: { orderBy: { ordenSerie: 'asc' } } } })
+    const [ida, vuelta] = llave.partidos
+
+    const idaConAlargue = await app.inject({ method: 'POST', url: `/api/partidos/${ida!.id}/estado`, payload: { estado: 'EN_CURSO' }, ...headers(tokenAdmin) })
+    expect(idaConAlargue.statusCode).toBe(200)
+    const rechazo = await app.inject({ method: 'POST', url: `/api/partidos/${ida!.id}/resultado`, payload: { golesLocal: 2, golesVisitante: 1, golesLocalReglamentario: 1, golesVisitanteReglamentario: 1 }, ...headers(tokenAdmin) })
+    expect(rechazo.statusCode).toBe(400)
+    expect((await finalizar(ida!.id, 2, 1)).statusCode).toBe(200)
+
+    const vueltaConAlargue = await app.inject({ method: 'POST', url: `/api/partidos/${vuelta!.id}/estado`, payload: { estado: 'EN_CURSO' }, ...headers(tokenAdmin) })
+    expect(vueltaConAlargue.statusCode).toBe(200)
+    const partidoVuelta = await getPrisma().partido.findUniqueOrThrow({ where: { id: vuelta!.id }, select: { equipoLocalId: true, equipoVisitanteId: true } })
+    for (let i = 0; i < 2; i++) await getPrisma().eventoPartido.create({ data: { partidoId: vuelta!.id, equipoId: partidoVuelta.equipoLocalId!, tipo: 'GOL', minuto: i + 1, periodo: i < 1 ? undefined : 'ALARGUE_PRIMER_TIEMPO' } })
+    for (let i = 0; i < 2; i++) await getPrisma().eventoPartido.create({ data: { partidoId: vuelta!.id, equipoId: partidoVuelta.equipoVisitanteId!, tipo: 'GOL', minuto: i + 1 } })
+    const aceptaVuelta = await app.inject({ method: 'POST', url: `/api/partidos/${vuelta!.id}/resultado`, payload: { golesLocal: 2, golesVisitante: 2, golesLocalReglamentario: 2, golesVisitanteReglamentario: 1 }, ...headers(tokenAdmin) })
+    expect(aceptaVuelta.statusCode).toBe(200)
+    const resuelta = await getPrisma().llaveCompetencia.findUniqueOrThrow({ where: { id: llave.id } })
+    expect(resuelta).toMatchObject({ estado: 'RESUELTA', metodoResolucion: 'ALARGUE' })
+
+    const partidoUnico = await crearCompetencia('Alargue único')
+    const crearUnico = await app.inject({ method: 'POST', url: `/api/torneo-categorias/${partidoUnico.id}/fases/eliminacion`, payload: { orden: 1, nombre: 'Playoffs', seeds: partidoUnico.participaciones.map((participacionId, i) => ({ participacionId, seed: i + 1 })), configuracion: { rondas: [{ orden: 1, formatoSerie: 'PARTIDO_UNICO', permiteAlargue: true, permitePenales: true }] } }, ...headers(tokenAdmin) })
+    expect(crearUnico.statusCode).toBe(200)
+    const faseUnica = crearUnico.json().data.id as string
+    expect((await app.inject({ method: 'POST', url: `/api/fases-competencia/${faseUnica}/generar`, payload: { confirmar: true }, ...headers(tokenAdmin) })).statusCode).toBe(200)
+    const llaveUnica = await getPrisma().llaveCompetencia.findFirstOrThrow({ where: { rondaEliminatoria: { faseCompetenciaId: faseUnica }, partidos: { some: {} } }, include: { partidos: true } })
+    const partido = llaveUnica.partidos[0]!
+    expect((await app.inject({ method: 'POST', url: `/api/partidos/${partido.id}/estado`, payload: { estado: 'EN_CURSO' }, ...headers(tokenAdmin) })).statusCode).toBe(200)
+    const equipos = await getPrisma().partido.findUniqueOrThrow({ where: { id: partido.id }, select: { equipoLocalId: true, equipoVisitanteId: true } })
+    await getPrisma().eventoPartido.create({ data: { partidoId: partido.id, equipoId: equipos.equipoLocalId!, tipo: 'GOL', minuto: 1 } })
+    await getPrisma().eventoPartido.create({ data: { partidoId: partido.id, equipoId: equipos.equipoLocalId!, tipo: 'GOL', minuto: 3, periodo: 'ALARGUE_PRIMER_TIEMPO' } })
+    await getPrisma().eventoPartido.create({ data: { partidoId: partido.id, equipoId: equipos.equipoVisitanteId!, tipo: 'GOL', minuto: 2 } })
+    const rechazoNoEmpate = await app.inject({ method: 'POST', url: `/api/partidos/${partido.id}/resultado`, payload: { golesLocal: 1, golesVisitante: 1, golesLocalReglamentario: 0, golesVisitanteReglamentario: 1 }, ...headers(tokenAdmin) })
+    expect(rechazoNoEmpate.statusCode).toBe(400)
+    const unico = await app.inject({ method: 'POST', url: `/api/partidos/${partido.id}/resultado`, payload: { golesLocal: 2, golesVisitante: 1, golesLocalReglamentario: 1, golesVisitanteReglamentario: 1 }, ...headers(tokenAdmin) })
+    expect(unico.statusCode).toBe(200)
+    expect((await getPrisma().llaveCompetencia.findUniqueOrThrow({ where: { id: llaveUnica.id } })).metodoResolucion).toBe('ALARGUE')
+
+    const sinSnapshot = await crearCompetencia('Alargue sin permiso')
+    const crearSin = await app.inject({ method: 'POST', url: `/api/torneo-categorias/${sinSnapshot.id}/fases/eliminacion`, payload: { orden: 1, nombre: 'Playoffs', seeds: sinSnapshot.participaciones.map((participacionId, i) => ({ participacionId, seed: i + 1 })), configuracion: { rondas: [{ orden: 1, formatoSerie: 'PARTIDO_UNICO', permiteAlargue: false, permitePenales: true }] } }, ...headers(tokenAdmin) })
+    const faseSin = crearSin.json().data.id as string
+    expect((await app.inject({ method: 'POST', url: `/api/fases-competencia/${faseSin}/generar`, payload: { confirmar: true }, ...headers(tokenAdmin) })).statusCode).toBe(200)
+    const llaveSin = await getPrisma().llaveCompetencia.findFirstOrThrow({ where: { rondaEliminatoria: { faseCompetenciaId: faseSin }, partidos: { some: {} } }, include: { partidos: true } })
+    expect((await app.inject({ method: 'POST', url: `/api/partidos/${llaveSin.partidos[0]!.id}/estado`, payload: { estado: 'EN_CURSO' }, ...headers(tokenAdmin) })).statusCode).toBe(200)
+    const sin = await app.inject({ method: 'POST', url: `/api/partidos/${llaveSin.partidos[0]!.id}/resultado`, payload: { golesLocal: 2, golesVisitante: 1, golesLocalReglamentario: 1, golesVisitanteReglamentario: 1 }, ...headers(tokenAdmin) })
+    expect(sin.statusCode).toBe(400)
+  })
+
+  it('FASE 16C bloquea corrección de eventos de partido resuelto hasta invalidar resolución', async () => {
+    const competencia = await crearCompetencia('Corrección bloqueada')
+    const crear = await app.inject({ method: 'POST', url: `/api/torneo-categorias/${competencia.id}/fases/eliminacion`, payload: { orden: 1, nombre: 'Playoffs', seeds: competencia.participaciones.map((participacionId, i) => ({ participacionId, seed: i + 1 })) }, ...headers(tokenAdmin) })
+    expect(crear.statusCode).toBe(200)
+    const faseId = crear.json().data.id as string
+    expect((await app.inject({ method: 'POST', url: `/api/fases-competencia/${faseId}/generar`, payload: { confirmar: true }, ...headers(tokenAdmin) })).statusCode).toBe(200)
+    const llave = await getPrisma().llaveCompetencia.findFirstOrThrow({ where: { rondaEliminatoria: { faseCompetenciaId: faseId }, partidos: { some: {} } }, include: { partidos: true } })
+    const partido = llave.partidos[0]!
+    expect((await finalizar(partido.id, 2, 1)).statusCode).toBe(200)
+    const golLocal = await getPrisma().eventoPartido.findFirstOrThrow({ where: { partidoId: partido.id, tipo: 'GOL' }, orderBy: { createdAt: 'asc' } })
+    expect((await getPrisma().llaveCompetencia.findUniqueOrThrow({ where: { id: llave.id } })).estado).toBe('RESUELTA')
+
+    const patchBloqueado = await app.inject({ method: 'PATCH', url: `/api/eventos-partido/${golLocal.id}`, payload: { minuto: 90 }, ...headers(tokenAdmin) })
+    expect(patchBloqueado.statusCode).toBe(409)
+    expect(patchBloqueado.json().error.code).toBe('llave_resuelta')
+    const anularBloqueado = await app.inject({ method: 'POST', url: `/api/eventos-partido/${golLocal.id}/anular`, ...headers(tokenAdmin) })
+    expect(anularBloqueado.statusCode).toBe(409)
+    expect(anularBloqueado.json().error.code).toBe('llave_resuelta')
+    const postBloqueado = await app.inject({ method: 'POST', url: `/api/partidos/${partido.id}/eventos`, payload: { tipo: 'TARJETA', equipoId: partido.equipoLocalId!, jugadorId: golLocal.jugadorId!, subtipo: 'AMARILLA', minuto: 10 }, ...headers(tokenAdmin) })
+    expect(postBloqueado.statusCode).toBe(409)
+    expect(postBloqueado.json().error.code).toBe('llave_resuelta')
+
+    const invalidar = await app.inject({ method: 'POST', url: `/api/llaves-competencia/${llave.id}/invalidar-resolucion`, payload: { confirmar: true }, ...headers(tokenAdmin) })
+    expect(invalidar.statusCode).toBe(200)
+    const permitido = await app.inject({ method: 'POST', url: `/api/eventos-partido/${golLocal.id}/anular`, ...headers(tokenAdmin) })
+    expect(permitido.statusCode).toBe(200)
+    expect(permitido.json().data.anulado).toBe(true)
+  })
+
+  it(`FASE 16C bloquea invalidar llave de fase que ya alimentó una fase posterior`, async () => {
+    const competencia = await crearCompetencia('Fase con posterior')
+    const seeds = competencia.participaciones.map((participacionId, i) => ({ participacionId, seed: i + 1 }))
+    expect((await app.inject({ method: 'POST', url: `/api/torneo-categorias/${competencia.id}/fases/eliminacion`, payload: { orden: 1, nombre: 'Semis', seeds }, ...headers(tokenAdmin) })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'POST', url: `/api/torneo-categorias/${competencia.id}/fases/eliminacion`, payload: { orden: 2, nombre: 'Final', seeds }, ...headers(tokenAdmin) })).statusCode).toBe(200)
+    const faseA = (await getPrisma().faseCompetencia.findFirstOrThrow({ where: { torneoCategoriaId: competencia.id, orden: 1 } })).id
+    const faseB = (await getPrisma().faseCompetencia.findFirstOrThrow({ where: { torneoCategoriaId: competencia.id, orden: 2 } })).id
+    await getPrisma().reglaClasificacionFase.create({ data: { faseOrigenId: faseA, faseDestinoId: faseB, orden: 1, tipo: 'POSICION_GENERAL', posicionDesde: 1, posicionHasta: 1, seedTipo: 'ORDEN_CLASIFICACION', seedInicio: 1, configuracion: { seed: 1 }, estado: 'CLASIFICADA' } })
+    expect((await app.inject({ method: 'POST', url: `/api/fases-competencia/${faseA}/generar`, payload: { confirmar: true }, ...headers(tokenAdmin) })).statusCode).toBe(200)
+    const llave = await getPrisma().llaveCompetencia.findFirstOrThrow({ where: { rondaEliminatoria: { faseCompetenciaId: faseA }, partidos: { some: {} } }, include: { partidos: true } })
+    expect((await finalizar(llave.partidos[0]!.id, 2, 1)).statusCode).toBe(200)
+    expect((await getPrisma().llaveCompetencia.findUniqueOrThrow({ where: { id: llave.id } })).estado).toBe('RESUELTA')
+    const invalida = await app.inject({ method: 'POST', url: `/api/llaves-competencia/${llave.id}/invalidar-resolucion`, payload: { confirmar: true }, ...headers(tokenAdmin) })
+    expect(invalida.statusCode).toBe(409)
+    expect(invalida.json().error.code).toBe('fase_posterior_historica')
   })
 })

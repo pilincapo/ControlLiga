@@ -26,6 +26,13 @@ export interface PartidoDetalle {
   equipoVisitante: { id: string; nombre: string; escudoUrl: string | null } | null
   torneo: { id: string; nombre: string } | null
   temporada: { id: string; nombre: string } | null
+  llaveCompetencia?: {
+    estado: string
+    metodoResolucion: string | null
+    definicion: { tipo: string; penalesLocal: number | null; penalesVisitante: number | null } | null
+    partidos: Array<{ id: string; ordenSerie: number | null; golesLocal: number | null; golesVisitante: number | null; estado: string }>
+    rondaEliminatoria: { nombre: string; formatoSerie: string; permiteAlargue: boolean; permitePenales: boolean }
+  } | null
   formacionInstancias: Array<{
     id: string
     jugadores: Array<{
