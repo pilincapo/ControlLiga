@@ -7,6 +7,8 @@ import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
 import TorneosPage from './pages/torneos/TorneosPage'
 import TorneoDetailPage from './pages/torneos/TorneoDetailPage'
+import OrganizacionesPage from './pages/organizaciones/OrganizacionesPage'
+import OrganizacionDetailPage from './pages/organizaciones/OrganizacionDetailPage'
 import EquiposPage from './pages/equipos/EquiposPage'
 import EquipoPage from './pages/equipos/EquipoPage'
 import JugadorPage from './pages/jugadores/JugadorPage'
@@ -85,6 +87,22 @@ function App() {
             element={
               <RequireAuth>
                 <TorneoDetailPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/organizaciones"
+            element={
+              <RequireAuth>
+                <OrganizacionesPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/organizaciones/:id"
+            element={
+              <RequireAuth>
+                <OrganizacionDetailPage />
               </RequireAuth>
             }
           />

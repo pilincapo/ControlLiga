@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from '../auth/useAuth'
 import { apiFetch } from '../utils/api'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import InvitacionesPendientes from './invitaciones/InvitacionesPendientes'
+import type { OrganizacionResumen } from './organizaciones/tipos'
+import type { Torneo } from './torneos/tipos'
 
 export default function ProfilePage() {
   const { usuario, vincularJugador } = useAuth()
@@ -15,6 +17,26 @@ export default function ProfilePage() {
   const [enviando, setEnviando] = useState(false)
   const [passwordActual, setPasswordActual] = useState('')
   const [passwordNueva, setPasswordNueva] = useState('')
+  const [organizaciones, setOrganizaciones] = useState<OrganizacionResumen[]>([])
+  const [torneos, setTorneos] = useState<Torneo[]>([])
+
+  useEffect(() => {
+    let activo = true
+    Promise.allSettled([
+      apiFetch<OrganizacionResumen[]>('/organizaciones'),
+      apiFetch<Torneo[]>('/torneos'),
+    ]).then(([orgs, torneosRes]) => {
+      if (!activo) return
+      if (orgs.status === 'fulfilled') setOrganizaciones(orgs.value)
+      if (torneosRes.status === 'fulfilled') setTorneos(torneosRes.value)
+    })
+    return () => {
+      activo = false
+    }
+  }, [])
+
+  const nombreOrg = (id: string) => organizaciones.find((o) => o.id === id)?.nombre ?? id
+  const nombreTorneo = (id: string) => torneos.find((t) => t.id === id)?.nombre ?? id
 
   if (!usuario) {
     return null
@@ -76,8 +98,8 @@ export default function ProfilePage() {
           {usuario.roles.map((r, i) => (
             <li key={i}>
               {r.codigo}
-              {r.organizacionId ? ` (organización ${r.organizacionId})` : ''}
-              {r.torneoId ? ` (torneo ${r.torneoId})` : ''}
+              {r.organizacionId ? ` (organización ${nombreOrg(r.organizacionId)})` : ''}
+              {r.torneoId ? ` (torneo ${nombreTorneo(r.torneoId)})` : ''}
             </li>
           ))}
         </ul>

@@ -4,7 +4,7 @@ import { getPrisma } from '../db.js'
 import { badRequest, noEncontrado, prohibido } from '../http.js'
 import { hashPassword } from '../auth/password.js'
 import { autenticar, getAuth } from '../plugins/auth.js'
-import { esSuperadmin, puedeAsignarRoles } from '../auth/permisos.js'
+import { esAdministradorOrganizacion, esSuperadmin, puedeAsignarRoles } from '../auth/permisos.js'
 import { auditar } from '../auth/auditoria.js'
 import { SELECT_USUARIO_PUBLICO } from './helpers.js'
 
@@ -25,9 +25,43 @@ interface AsignarRolesBody {
   }>
 }
 
+interface RetirarRolBody {
+  codigo: RolCodigo
+  organizacionId?: string | null
+  torneoId?: string | null
+  equipoId?: string | null
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function usuariosRoutes(app: FastifyInstance): Promise<void> {
+  app.get('/usuarios', { preHandler: autenticar }, async (request) => {
+    const auth = getAuth(request)
+    const query = request.query as { organizacionId?: string }
+    const prisma = getPrisma()
+    if (query.organizacionId) {
+      if (!esAdministradorOrganizacion(auth, query.organizacionId)) {
+        throw prohibido('No tenés acceso a esa organización')
+      }
+      const organizacion = await prisma.organizacion.findUnique({ where: { id: query.organizacionId }, select: { id: true } })
+      if (!organizacion) throw noEncontrado('Organización')
+      const miembros = await prisma.rolUsuario.findMany({
+        where: { organizacionId: query.organizacionId, activo: true },
+        select: { usuario: { select: SELECT_USUARIO_PUBLICO } },
+        distinct: ['usuarioId'],
+      })
+      return { data: miembros.map((m) => m.usuario) }
+    }
+    if (!esSuperadmin(auth)) {
+      throw prohibido('Solo el SUPERADMIN puede listar usuarios')
+    }
+    const usuarios = await prisma.usuario.findMany({
+      select: { id: true, email: true, nombre: true, apellido: true, activo: true },
+      orderBy: { email: 'asc' },
+    })
+    return { data: usuarios }
+  })
+
   app.get('/usuarios/:id', { preHandler: autenticar }, async (request, reply) => {
     const auth = getAuth(request)
     const { id } = request.params as { id: string }
@@ -171,6 +205,77 @@ export async function usuariosRoutes(app: FastifyInstance): Promise<void> {
       where: { id },
       select: SELECT_USUARIO_PUBLICO,
     })
+    return { data: resultado }
+  })
+
+  app.delete('/usuarios/:id/roles', { preHandler: autenticar }, async (request) => {
+    const auth = getAuth(request)
+    const { id } = request.params as { id: string }
+    const body = request.body as RetirarRolBody
+    const prisma = getPrisma()
+
+    const existente = await prisma.usuario.findUnique({
+      where: { id },
+      include: { roles: { include: { rol: true } } },
+    })
+    if (!existente) {
+      throw noEncontrado('Usuario')
+    }
+    const actuales = existente.roles
+      .filter((rol) => rol.activo)
+      .map((rol) => ({
+        codigo: rol.rol.codigo as RolCodigo,
+        organizacionId: rol.organizacionId,
+        torneoId: rol.torneoId,
+        equipoId: rol.equipoId,
+        jugadorId: rol.jugadorId,
+      }))
+    const objetivo = actuales.filter(
+      (r) =>
+        r.codigo !== body.codigo ||
+        r.organizacionId !== (body.organizacionId ?? null) ||
+        r.torneoId !== (body.torneoId ?? null) ||
+        r.equipoId !== (body.equipoId ?? null),
+    )
+    if (objetivo.length === actuales.length) {
+      throw badRequest('El rol indicado no existe para ese usuario')
+    }
+
+    const rol = await prisma.rol.findUnique({ where: { codigo: body.codigo }, select: { id: true } })
+    if (!rol) {
+      throw badRequest('El rol no existe')
+    }
+
+    const { organizacionId, torneoId, equipoId } = body
+    const membresiasOrg = await prisma.rolUsuario.findMany({
+      where: { organizacionId: organizacionId ?? undefined, activo: true, rol: { codigo: body.codigo } },
+      select: { usuarioId: true },
+    })
+    if (
+      body.codigo === 'ADMINISTRADOR' &&
+      organizacionId &&
+      !objetivo.some((o) => o.codigo === 'ADMINISTRADOR' && o.organizacionId === organizacionId) &&
+      !membresiasOrg.some((m) => m.usuarioId !== id)
+    ) {
+      throw prohibido('No se puede retirar al último administrador de la organización')
+    }
+
+    await puedeAsignarRoles(prisma, auth, id, actuales, objetivo)
+
+    await prisma.$transaction(async (tx) => {
+      await tx.rolUsuario.deleteMany({
+        where: { usuarioId: id, rolId: rol.id, organizacionId: organizacionId ?? null, torneoId: torneoId ?? null, equipoId: equipoId ?? null },
+      })
+      await auditar(tx, {
+        entidad: 'Usuario',
+        entidadId: id,
+        accion: 'UPDATE',
+        usuarioId: auth.usuarioId,
+        cambios: { rolRetirado: { codigo: body.codigo, organizacionId, torneoId, equipoId } },
+      })
+    })
+
+    const resultado = await prisma.usuario.findUnique({ where: { id }, select: SELECT_USUARIO_PUBLICO })
     return { data: resultado }
   })
 }

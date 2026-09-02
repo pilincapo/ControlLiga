@@ -13,6 +13,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const enlaces = [
     { to: '/dashboard', texto: 'Inicio', visible: true },
     { to: '/torneos', texto: 'Torneos', visible: tiene(PERMISOS.torneosVer) },
+    { to: '/organizaciones', texto: 'Organizaciones', visible: tiene(PERMISOS.organizacionesAdministrar) },
     { to: '/equipos', texto: 'Equipos', visible: tiene(PERMISOS.equiposVer) },
     { to: '/formaciones', texto: 'Formaciones', visible: tiene(PERMISOS.formacionesVer) },
     { to: '/convocatorias', texto: 'Convocatorias', visible: tiene(PERMISOS.convocatoriasVer) },

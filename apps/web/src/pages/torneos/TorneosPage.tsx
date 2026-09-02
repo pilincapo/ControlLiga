@@ -6,10 +6,12 @@ import { apiFetch } from '../../utils/api'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../auth/useAuth'
 import type { Torneo } from './tipos'
+import type { OrganizacionResumen } from '../organizaciones/tipos'
 
 export default function TorneosPage() {
   const { usuario } = useAuth()
   const [torneos, setTorneos] = useState<Torneo[]>([])
+  const [organizaciones, setOrganizaciones] = useState<OrganizacionResumen[]>([])
   const [organizacionId, setOrganizacionId] = useState('')
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -32,6 +34,18 @@ export default function TorneosPage() {
       .catch((err) => {
         if (activo) setError(err instanceof Error ? err.message : 'No se pudieron cargar los torneos')
       })
+    if (activo) {
+      apiFetch<OrganizacionResumen[]>('/organizaciones')
+        .then((data) => {
+          if (activo) {
+            setOrganizaciones(data)
+            if (data.length === 1) setOrganizacionId(data[0].id)
+          }
+        })
+        .catch(() => {
+          /* el select queda vacío si no se pueden cargar las organizaciones */
+        })
+    }
     return () => {
       activo = false
     }
@@ -66,8 +80,15 @@ export default function TorneosPage() {
           <h3>Nuevo torneo</h3>
           <form onSubmit={crear}>
             <div className="campo">
-              <label htmlFor="n-org">ID de organización</label>
-              <input id="n-org" value={organizacionId} onChange={(e) => setOrganizacionId(e.target.value)} placeholder="uuid de la organización" required />
+              <label htmlFor="n-org">Organización</label>
+              <select id="n-org" value={organizacionId} onChange={(e) => setOrganizacionId(e.target.value)} required>
+                <option value="">Seleccioná una organización…</option>
+                {organizaciones.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.nombre}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="campo">
               <label htmlFor="n-nombre">Nombre</label>

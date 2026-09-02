@@ -49,6 +49,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - Cerradas: FASE 16A (grupos y eliminación directa), FASE 16B (clasificación automática), FASE 16C (series eliminatorias avanzadas), hardening de seguridad cross-tenant posterior a 16C y FASE 17 (Operación de Liga).
 - Próximas propuestas: ver `docs/revision-post-fase-13.md` §9.
 
+### FASE 18 — Administración de organización + primera beta real (diseñada)
+
+- Diseño propuesto en `docs/fase-18-diseno-administracion-org-beta.md`: cierra la brecha operativa de FASE 17 (sin ingreso manual de UUID).
+- Backend nuevo acotado (5 rutas): `GET /organizaciones` (listar administradas), `POST /organizaciones` (solo `SUPERADMIN`, mativa auto-alta de su rol ADMINISTRADOR), `GET /organizaciones/:id/usuarios`, `GET /usuarios?organizacionId=` y `DELETE /usuarios/:id/roles` (retiro de rol con guard de último ADMINISTRADOR). El resto (crear torneo, editar org, asignar roles) ya existe y se reutiliza.
+- Email real (SMTP): nuevo `EmailSenderSmtp` (nodemailer); credenciales `SMTP_*` **obligatorias en producción** (`NODE_ENV=production` sin credenciales no arranca), con `EmailSenderDesarrollo` solo fuera de producción. Cubre reset de password; se deja la interfaz lista para invitaciones.
+- Primer `ADMINISTRADOR` de una organización se asigna **desde UI de SUPERADMIN** tras crear la organización (o auto-alta del SUPERADMIN al crearla); sin dependencia de seed manual.
+- Frontend: `OrganizacionesPage` y `OrganizacionDetailPage` (config, torneos, usuarios/roles); `TorneosPage` reemplaza el input UUID por `<select>` de organizaciones; `Layout` añade enlace «Organizaciones»; `ProfilePage` muestra nombres en vez de UUID.
+- Fuera de alcance: invitaciones a usuarios inexistentes (schema propio, diferido) y roles nuevos (se opera con `ADMINISTRADOR` scoped).
+- Sin migración obligatoria para el alcance base.
+
 ## [0.15.0] - 2026-08-11
 
 ### Cambiado

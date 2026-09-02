@@ -35,6 +35,11 @@ export const env = {
   PASSWORD_RESET_TTL_MINUTES: numeroPositivo('PASSWORD_RESET_TTL_MINUTES', process.env.PASSWORD_RESET_TTL_MINUTES, 60),
   PASSWORD_RESET_URL_BASE: process.env.PASSWORD_RESET_URL_BASE ?? 'http://localhost:5173/reset-password',
   EMAIL_FROM: process.env.EMAIL_FROM ?? 'no-reply@controlliga.local',
+  SMTP_HOST: process.env.SMTP_HOST ?? '',
+  SMTP_PORT: numeroPositivo('SMTP_PORT', process.env.SMTP_PORT, 587),
+  SMTP_USER: process.env.SMTP_USER ?? '',
+  SMTP_PASS: process.env.SMTP_PASS ?? '',
+  SMTP_SECURE: (process.env.SMTP_SECURE ?? 'false') === 'true',
   HEALTH_DB_TOKEN: process.env.HEALTH_DB_TOKEN ?? '',
   PASSWORD_RATE_LIMIT_MAX: numeroPositivo('PASSWORD_RATE_LIMIT_MAX', process.env.PASSWORD_RATE_LIMIT_MAX, 5),
   PASSWORD_RATE_LIMIT_WINDOW_MS: numeroPositivo('PASSWORD_RATE_LIMIT_WINDOW_MS', process.env.PASSWORD_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
@@ -56,6 +61,9 @@ if (env.NODE_ENV === 'production') {
   }
   if (env.EMAIL_FROM.endsWith('.local')) {
     throw new Error('EMAIL_FROM debe ser un remitente real en producción')
+  }
+  if (!env.SMTP_HOST || !env.SMTP_PORT) {
+    throw new Error('SMTP_HOST y SMTP_PORT son obligatorios en producción')
   }
   if (env.HEALTH_DB_TOKEN.length < 24) {
     throw new Error('HEALTH_DB_TOKEN debe tener al menos 24 caracteres en producción')
