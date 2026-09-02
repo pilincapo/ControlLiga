@@ -246,11 +246,23 @@ La propuesta historica al final de `docs/fase-13-diseno-invitaciones-notificacio
 
 ## 9. Roadmap tentativo
 
-1. **FASE 14:** Hardening multi-tenant y preparacion beta controlada.
-2. **FASE 15:** Portal publico de producto y experiencia de usuario por rol. Completar fixture/tabla/resultados/estadisticas publicas, vistas de jugador y navegacion condicionada. Sin CMS, noticias o storage al inicio.
-3. **FASE 16:** Competencia avanzada, previo diseno aprobado. Empezar por fase de grupos + clasificacion y luego playoffs; no mezclar pagos, arbitros o reprogramacion compleja en misma fase.
+### Cerradas
 
-Alternativa si primeras pruebas de beta demuestran que captacion de jugadores es necesidad principal: intercambiar FASE 15 por solicitud jugador -> equipo, manteniendo FASE 14 antes.
+- **FASE 14:** Hardening multi-tenant y preparacion beta controlada.
+- **FASE 15:** Portal publico de producto y experiencia de usuario por rol.
+- **FASE 16A:** Grupos y eliminacion directa a partido unico (BYE, seeds, avance seguro).
+- **FASE 16B:** Clasificacion automatica y transicion entre fases.
+- **FASE 16C:** Series eliminatorias avanzadas (ida/vuelta, global, tercer puesto, penales).
+- **Hardening cross-tenant posterior a 16C:** scopes reales de rol para estadisticas y sanciones, sin bypass por ADMINISTRADOR global.
+- **FASE 17:** Operacion de Liga (slugs, zona horaria, cancelacion de partidos).
+
+### Propuesta: proximas 3 fases (prioridad)
+
+1. **FASE 18 — Administracion de organizacion y primera beta real.** Falta UI de gestion de organizaciones/torneos/usuarios/roles (hoy `TorneosPage` pide el UUID por prompt nativo) y el proveedor de email real (adapter es desarrollo; bloqueante de beta). Habilitar SMTP transaccional, alta/edicion/roles por UI y monitoreo, y abrir beta controlada con una organizacion y liga simple.
+2. **FASE 19 — Minutos y estadisticas de jugador completas.** Minutos hoy quedan en `null`/`minutosNoDeterminados`; completar calculo desde eventos y agregar propios/penales/walkover, disciplina acumulada y criterios por reglamento pendientes.
+3. **FASE 20 — Notificaciones y alcance movil.** Push/WhatsApp y PWA/app movil eran no-bloqueantes de beta y siguen pendientes; notificaciones hoy retienen sin limite. Ronda conectar invitaciones/partidos a canales moviles y prioridad de notificaciones.
+
+Alternativa si las primeras pruebas de beta muestran que la captacion de jugadores es la necesidad principal: intercambiar FASE 19 por solicitud jugador -> equipo (manteniendo FASE 18 antes).
 
 ## 10. Preparacion para beta con usuarios reales
 

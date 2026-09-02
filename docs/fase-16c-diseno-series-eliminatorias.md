@@ -1,6 +1,6 @@
 # FASE 16C - Series eliminatorias avanzadas
 
-Estado: APROBADA PARA IMPLEMENTACION.
+Estado: **IMPLEMENTADA Y CERRADA.** Desarrollada en `5be3b8f`; este documento queda como registro de diseño autorizado.
 
 ## 1. Objetivo y limites
 

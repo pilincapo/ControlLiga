@@ -1,6 +1,6 @@
 # Beta readiness
 
-Estado inicial FASE 14. Actualizar despues de verificar despliegue real.
+Estado actual: FASE 17 cerrada (competencias avanzadas 16A/16B/16C, hardening cross-tenant y Operacion de Liga implementados). Pendiente de verificar despliegue real para validar beta en produccion.
 
 > **Funciones financieras retiradas.** No hay caja, cuotas/pagos del plantel ni MercadoPago/gateways en el producto actual; tampoco los hay previstos post-beta. Las migraciones y modelos históricos de caja (`MovimientoCaja`) se conservan solo por compatibilidad e historial, sin exponerse a usuarios.
 

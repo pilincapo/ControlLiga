@@ -11,7 +11,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - Roadmap y docs actualizados: no hay funcionalidad financiera (caja, cuotas/pagos, MercadoPago/gateways) en el horizonte actual.
 - Documentación de hoja de ruta vigente actualizada: `revision-post-fase-13.md` marca FASE 10 «Caja» como RETIRADA y descarta «Caja de cuotas/pagos» y MercadoPago/gateways de los pendientes; `README.md`, `beta-readiness.md` y `fase-14-diseno-hardening-beta.md` declaran funciones financieras fuera del producto y que las migraciones/modelos históricos se conservan solo por compatibilidad e historial.
 
-### FASE 17
+### FASE 17 — CERRADA
 
 - Operación de liga: organizaciones y torneos ahora publican slugs (`slug` único, autogenerado desde el nombre y editable vía `PATCH /organizaciones/:id` y torneos) y `zonaHoraria` con default `America/Argentina/Buenos_Aires`.
 - Portal público: nueva `PublicCompetitionPage` en `/publico/competencias/:id` con fixture y tabla por zona, enrutada desde `App.tsx`.
@@ -19,14 +19,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - Transiciones de estado permiten cancelar partidos desde PROGRAMADO, EN_CURSO, APLAZADO y SUSPENDIDO; CANCELADO es terminal.
 - Migración `20260901120000_fase17_operacion_liga`: enum `CANCELADO`, columnas `slug` y `zonaHoraria`, `motivoCancelacion`, backfill de slugs e índices únicos de slug.
 
-### Seguridad
+### Seguridad (hardening cross-tenant posterior a 16C) — CERRADO
 
 - FASE 17 hardening minimo: el acceso a estadisticas y sanciones queda acotado al scope real del rol, sin bypasses por ser ADMINISTRADOR global.
 - `puedeVerPartido`, `puedeVerEquipo` y `puedeVerEstadisticasJugador` resuelven la organizacion por torneo/participacion y aplican `esAdministradorOrganizacion`/`esAdministradorTorneo`; el POST de sanciones valida coherencia equipo-partido-torneo-jugador y la resolucion queda scoped al torneo.
 
+### FASE 16C — CERRADA
+
+- Series eliminatorias por llave con ida/vuelta, global derivado, alargue, penales, definición administrativa, tercer puesto y reglas por ronda: implementadas y migradas.
+
 ### Agregado
 
-- FASE 16C en desarrollo: series eliminatorias por llave con ida/vuelta, global derivado, alargue, penales, definición administrativa, tercer puesto y reglas por ronda.
 - Cobertura HTTP/integración FASE 16B para clasificación de grupos y LIGA, snapshots, idempotencia, invalidación, mejores terceros, RBAC y privacidad pública.
 - FASE 16B backend: reglas de clasificación, clasificados y participantes por fase, transición trazable con seeds y FK restrictivas para llaves.
 - FASE 16B: clasificación transaccional ahora materializa participantes y genera eliminación destino con slots de participante-fase; tablas y partidos quedan limitados a fase origen, incluyendo LIGA.
@@ -37,9 +40,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ### Documentación
 
-- Diseño de FASE 16C aprobado para implementación; trabajo local en desarrollo, aún no cerrado.
+- Diseño de FASE 16C implementado y cerrado (`docs/fase-16c-diseno-series-eliminatorias.md`); marca de estado actualizada.
 - Diseño propuesto de FASE 16 para competencia avanzada, con recomendación de dividir grupos/eliminación, clasificación y series ida/vuelta en entregas compatibles con historial.
 - Diseño de FASE 16B para clasificación automática, transiciones entre fases, snapshots, trazabilidad y bloqueo histórico.
+
+### Roadmap hasta FASE 17
+
+- Cerradas: FASE 16A (grupos y eliminación directa), FASE 16B (clasificación automática), FASE 16C (series eliminatorias avanzadas), hardening de seguridad cross-tenant posterior a 16C y FASE 17 (Operación de Liga).
+- Próximas propuestas: ver `docs/revision-post-fase-13.md` §9.
 
 ## [0.15.0] - 2026-08-11
 
