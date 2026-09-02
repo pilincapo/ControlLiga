@@ -55,7 +55,7 @@ FASE 14 no requiere modelos ni migraciones. Roles, sesiones, tokens, auditoria, 
 
 ## Fuera de alcance
 
-- Schema/migraciones, competencia avanzada, pagos, PWA, push, WhatsApp, app movil, storage, noticias, SEO, arbitros, reprogramacion formal y minutos calculados.
+- Schema/migraciones, competencia avanzada, PWA, push, WhatsApp, app movil, storage, noticias, SEO, arbitros, reprogramacion formal y minutos calculados.
 - Minutos siguen `null` y `minutosNoDeterminados: true`.
 
 ## Riesgos

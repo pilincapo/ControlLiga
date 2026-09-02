@@ -9,6 +9,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - Funciones financieras (Caja, cuotas/pagos del plantel, módulo de movimientos) retiradas del producto actual. Se eliminaron las rutas API de caja (`/equipos/:id/caja`, `/movimientos-caja/:id/estado` y de jugador), sus tests, los permisos `caja:ver`/`caja:administrar`, el acceso a Caja en `DashboardPage`, la sección Caja/cuotas-pagos de `EquipoPage` y «Mi caja» de `JugadorPage`.
 - La tabla `movimiento_caja` y sus migraciones/histórico se conservan intactas: no se borran datos ni se tocan migraciones; simplemente la app ya no expone financiero.
 - Roadmap y docs actualizados: no hay funcionalidad financiera (caja, cuotas/pagos, MercadoPago/gateways) en el horizonte actual.
+- Documentación de hoja de ruta vigente actualizada: `revision-post-fase-13.md` marca FASE 10 «Caja» como RETIRADA y descarta «Caja de cuotas/pagos» y MercadoPago/gateways de los pendientes; `README.md`, `beta-readiness.md` y `fase-14-diseno-hardening-beta.md` declaran funciones financieras fuera del producto y que las migraciones/modelos históricos se conservan solo por compatibilidad e historial.
 
 ### FASE 17
 

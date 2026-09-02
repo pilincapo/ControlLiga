@@ -3,6 +3,8 @@
 Sistema de gestión de ligas de fútbol: torneos, equipos, jugadores, partidos, fixture y estadísticas.
 
 > **Estado actual**: aplicación funcional hasta FASE 14, con hardening multi-tenant y preparación para beta controlada. Ver `docs/beta-readiness.md` antes de desplegar.
+>
+> **Funciones financieras retiradas**: no hay caja, cuotas/pagos del plantel ni MercadoPago/gateways en el producto actual ni en la hoja de ruta. Las migraciones/modelos de caja se conservan solo por compatibilidad e historial, sin exponerse a usuarios.
 
 ## Stack
 

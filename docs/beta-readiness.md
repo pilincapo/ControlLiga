@@ -2,6 +2,8 @@
 
 Estado inicial FASE 14. Actualizar despues de verificar despliegue real.
 
+> **Funciones financieras retiradas.** No hay caja, cuotas/pagos del plantel ni MercadoPago/gateways en el producto actual; tampoco los hay previstos post-beta. Las migraciones y modelos históricos de caja (`MovimientoCaja`) se conservan solo por compatibilidad e historial, sin exponerse a usuarios.
+
 | Area | Estado | Criterio |
 |---|---|---|
 | Auth y sesiones | LISTO PARA BETA | Sesiones hasheadas, revocacion de cuentas inactivas, reset y cambio de password. |
@@ -14,7 +16,7 @@ Estado inicial FASE 14. Actualizar despues de verificar despliegue real.
 | Logging | LISTO PARA BETA | No loguear secretos; configurar retencion y acceso de operador. |
 | Monitoreo | PENDIENTE PRODUCCION | Agregar metricas, alertas y trazas antes de escalar. |
 | Warning `pg` | PENDIENTE PRODUCCION | Trazas ubican aviso en `@prisma/adapter-pg` 7.9.1 al ejecutar transacciones concurrentes sobre `pg` 8.23.0. Suite verde; no actualizar dependencia sin compatibilidad Prisma validada. |
-| PWA, movil, push, pagos | PENDIENTE PRODUCCION | Fuera de FASE 14. |
+| PWA, movil, push | PENDIENTE PRODUCCION | Fuera de FASE 14. |
 
 ## Backup y restore
 

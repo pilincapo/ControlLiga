@@ -4,6 +4,8 @@ Fecha: 2026-08-11
 
 Base revisada: `main`, commit `7a96b66`.
 
+> **Nota de vigencia sobre funciones financieras.** Este documento es un registro histórico de la revisión post FASE 13. Desde entonces la Caja fue retirada del producto actual: **no hay caja, cuotas/pagos del plantel ni MercadoPago/gateways** en las hojas de ruta vigentes. Las migraciones y modelos históricos de caja (`MovimientoCaja`) se conservan solo por compatibilidad e historial, sin exponerse a usuarios. Las referencias a «Caja» abajo como módulo activo o como pendiente quedan anuladas por esta nota.
+
 ## 1. Resumen ejecutivo
 
 ControlLiga tiene una base funcional y probada para operar ligas simples, equipos, planteles, partidos, convocatorias, formaciones, eventos basicos, caja simple, portal publico e invitaciones internas. La suite declarada al inicio de esta revision permanece verde: 275 tests API, 21 web y 2 shared. Durante esta revision se ejecuto API: 275 tests verdes en 113 s.
@@ -27,7 +29,7 @@ Recomendacion: FASE 14 debe ser **Hardening multi-tenant y preparacion para beta
 | Partidos | CRUD, estados, resultado, publicacion, convocatorias/formaciones asociadas y auditoria. |
 | Formaciones y convocatorias | Operacion principal, snapshots de formacion, respuestas y publicacion. |
 | Eventos, estadisticas y disciplina | Goles, asistencias, tarjetas, sustituciones, anulacion/correccion auditada, estadisticas bajo demanda y sanciones explicitas. |
-| Caja simple | Movimientos, estados, resumen, deudas simples, filtros API, auditoria y privacidad por equipo. |
+| Caja simple | ~~Movimientos, estados, resumen, deudas simples, filtros API, auditoria y privacidad por equipo.~~ **RETIRADA del producto actual** (solo datos historicos conservados, sin exponerse). |
 | Portal publico API | Torneos, temporadas, categorias, zonas, fixture, tabla, estadisticas, equipos, partidos, formaciones y convocatorias con proyecciones limitadas. |
 | Invitaciones y notificaciones | Invitacion formal de jugador/cuerpo tecnico, TTL lazy, aceptacion/rechazo/revocacion, notificaciones internas persistentes, contador y deep-links. |
 
@@ -37,7 +39,7 @@ Recomendacion: FASE 14 debe ser **Hardening multi-tenant y preparacion para beta
 |---|---|
 | Competencia | Schema/shared enumeran grupos, playoffs y eliminacion; motor solo acepta `TODOS_CONTRA_TODOS`, `UNA_RUEDA` y `DOS_RUEDAS` (`apps/api/src/fixture/servicio.ts:11,57-61`). |
 | Portal publico web | Existe navegacion de torneo/temporada/categoria, pero `PublicResourcePage` muestra JSON crudo y no hay pantallas de fixture, tabla, goleadores, tarjetas, formaciones ni convocatorias. |
-| Caja web | Alta simple, pago/anulacion y resumen dentro de `EquipoPage`; faltan filtros, deudas, historial, detalle, comprobantes y categorias completas. |
+| Caja web | ~~Alta simple, pago/anulacion y resumen dentro de `EquipoPage`; faltan filtros, deudas, historial, detalle, comprobantes y categorias completas.~~ **RETIRADA**: sin UI de caja en el producto actual. |
 | Eventos y disciplina web | Detalle muestra informacion; no hay UI para crear/corregir/anular eventos ni gestionar sanciones/leaderboards. |
 | Gestion administrativa | API de usuarios/roles existe; no hay UI de usuarios, roles u organizaciones. `organizaciones` solo expone detalle. |
 | Comunicacion externa | Email de password reset usa `EmailSenderDesarrollo`, sin SMTP/API real. Invitaciones y notificaciones son internas solamente. |
@@ -94,7 +96,7 @@ Recomendacion: FASE 14 debe ser **Hardening multi-tenant y preparacion para beta
 
 ### Caja y plataforma
 
-- Caja: sin pagos parciales, vencimientos, obligaciones/cuotas recurrentes, MercadoPago, facturacion ni contabilidad.
+- Caja: **RETIRADA del producto actual.** No hay pagos parciales, vencimientos, obligaciones/cuotas recurrentes, MercadoPago, facturacion ni contabilidad; tampoco estan previstos post-beta. Migraciones/modelos historicos se conservan solo por compatibilidad.
 - Plataforma: sin PWA/app movil, storage seguro de imagenes, proveedor de email, limitador distribuido, CI/CD/deploy, backups, metricas, trazas, alertas ni retencion de notificaciones/tokens.
 
 ## 4. Deuda tecnica
@@ -185,7 +187,7 @@ Se reprodujo al ejecutar API: `DeprecationWarning: Calling client.query() when t
 | B. Competencia avanzada | Alto valor para ligas con grupos/playoffs; diferencia de producto. | Alta/muy alta: motor, reglas, estado, trazabilidad, UI de llaves y migracion compleja. | Nuevos modelos Fase/Llave/Serie/slot/origen/resultado; cambios en Partido, tabla, fixture y portal. | Despues de hardening y diseno completo. No hay base de dominio suficiente. |
 | C. Portal publico de producto | Hace visible valor del sistema a jugadores/publico; usa API existente. | Media. Riesgo bajo de datos si primero se corrigen politicas publicas. | Sin schema en primera entrega; potencial slugs/contenido despues. Mucho frontend y tests. | Despues de hardening. Es buen candidato FASE 15. |
 | D. Solicitudes jugador-equipo | Completa onboarding de planteles y usa notificaciones. | Media: privacidad, busqueda, antispam, estados y aprobacion. | Probable modelo `SolicitudIngresoEquipo` o extension bien definida de invitaciones; migracion probable. | Despues de seguridad; antes solo si beta necesita captacion. |
-| E. Caja de cuotas/pagos | Valor operativo para equipos. | Alta: obligaciones, pagos parciales, vencimientos, conciliacion y proveedor externo. | Modelos de obligacion/pago; integracion de pagos. | Despues de beta inicial y de definir proceso contable. |
+| E. Caja de cuotas/pagos | ~~Valor operativo para equipos.~~ **Descartado y RETIRADO:** no hay funciones financieras (caja, cuotas/pagos, MercadoPago/gateways) en el horizonte; migraciones/modelos historicos se conservan solo por compatibilidad. | — | — | — |
 
 ## 8. Recomendacion: FASE 14
 
@@ -265,10 +267,10 @@ Alternativa si primeras pruebas de beta demuestran que captacion de jugadores es
 ### No bloqueantes para beta controlada
 
 - Grupos/playoffs, llave visual y tercer puesto, si beta se limita a ligas round-robin.
-- PWA/app movil, push, WhatsApp, MercadoPago, facturacion y contabilidad avanzada.
+- ~~PWA/app movil, push, WhatsApp, MercadoPago, facturacion y contabilidad avanzada.~~ **Corregido:** MercadoPago, facturacion y contabilidad ya no se contemplan (Caja retirada); queda PWA/app movil, push y WhatsApp.
 - Noticias, fotos, slugs/SEO avanzados.
 - Entidades de arbitro/cancha y reprogramacion con historial formal, si se opera manualmente con alcance limitado.
-- Pagos parciales/cuotas recurrentes.
+- ~~Pagos parciales/cuotas recurrentes.~~ **Corregido:** pagos/cuotas retirados del horizonte.
 - Calculo de minutos.
 
 ### Condicion de beta sugerida
