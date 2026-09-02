@@ -4,6 +4,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
 
+### FASE 17
+
+- Operación de liga: organizaciones y torneos ahora publican slugs (`slug` único, autogenerado desde el nombre y editable vía `PATCH /organizaciones/:id` y torneos) y `zonaHoraria` con default `America/Argentina/Buenos_Aires`.
+- Portal público: nueva `PublicCompetitionPage` en `/publico/competencias/:id` con fixture y tabla por zona, enrutada desde `App.tsx`.
+- Partidos: nuevo estado `CANCELADO` con `motivoCancelacion` obligatorio; cancelar un partido borra goles y goles reglamentarios, registra el resultado anterior en auditoría y bloquea carga de resultados sobre partidos cancelados.
+- Transiciones de estado permiten cancelar partidos desde PROGRAMADO, EN_CURSO, APLAZADO y SUSPENDIDO; CANCELADO es terminal.
+- Migración `20260901120000_fase17_operacion_liga`: enum `CANCELADO`, columnas `slug` y `zonaHoraria`, `motivoCancelacion`, backfill de slugs e índices únicos de slug.
+
 ### Seguridad
 
 - FASE 17 hardening minimo: el acceso a estadisticas y sanciones queda acotado al scope real del rol, sin bypasses por ser ADMINISTRADOR global.

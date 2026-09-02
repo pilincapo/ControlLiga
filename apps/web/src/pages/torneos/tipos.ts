@@ -3,12 +3,15 @@ import type { ConfiguracionPublica, FormatoCompetencia, CriterioDesempate, Siste
 export interface OrganizacionResumen {
   id: string
   nombre: string
+  slug: string | null
+  zonaHoraria: string
 }
 
 export interface Torneo {
   id: string
   organizacionId: string
   nombre: string
+  slug: string | null
   descripcion: string | null
   logoUrl: string | null
   reglas: string | null

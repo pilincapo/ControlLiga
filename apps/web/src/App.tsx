@@ -20,6 +20,7 @@ import InvitacionesPage from './pages/invitaciones/InvitacionesPage'
 import NotificacionesPage from './pages/notificaciones/NotificacionesPage'
 import PublicPortalPage from './pages/PublicPortalPage'
 import PublicResourcePage from './pages/PublicResourcePage'
+import PublicCompetitionPage from './pages/PublicCompetitionPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import './index.css'
@@ -32,7 +33,7 @@ function App() {
           <Route path="/publico/torneos" element={<PublicPortalPage />} />
           <Route path="/publico/torneos/:id" element={<PublicPortalPage />} />
           <Route path="/publico/torneos/:torneoId/temporadas/:id" element={<PublicResourcePage />} />
-            <Route path="/publico/competencias/:id" element={<PublicResourcePage />} />
+            <Route path="/publico/competencias/:id" element={<PublicCompetitionPage />} />
             <Route path="/publico/competencias/:id/fases" element={<PublicResourcePage />} />
           <Route path="/publico/partidos/:id" element={<PublicResourcePage />} />
           <Route path="/publico/equipos/:id" element={<PublicResourcePage />} />

@@ -148,6 +148,19 @@ describe('módulo de partidos (FASE 7)', () => {
     expect(pr.statusCode).toBe(200)
   })
 
+  it('cancela un partido, borra marcador y exige motivo', async () => {
+    const c = await app.inject({ method: 'POST', url: '/api/partidos', payload: { tipo: 'AMISTOSO', equipoLocalId: equipoA.id, equipoVisitanteId: equipoB.id, fechaHora: '2027-03-15T15:00:00Z' }, headers: conCookie(tokenDelegadoA) })
+    const id = c.json().data.id as string
+    await app.inject({ method: 'POST', url: `/api/partidos/${id}/resultado`, payload: { golesLocal: 1, golesVisitante: 0 }, headers: conCookie(tokenDelegadoA) })
+    const sinMotivo = await app.inject({ method: 'POST', url: `/api/partidos/${id}/estado`, payload: { estado: 'CANCELADO' }, headers: conCookie(tokenDelegadoA) })
+    expect(sinMotivo.statusCode).toBe(400)
+    const cancelado = await app.inject({ method: 'POST', url: `/api/partidos/${id}/estado`, payload: { estado: 'CANCELADO', motivoCancelacion: 'Lluvia' }, headers: conCookie(tokenDelegadoA) })
+    expect(cancelado.statusCode).toBe(200)
+    expect(cancelado.json().data).toMatchObject({ estado: 'CANCELADO', golesLocal: null, golesVisitante: null, motivoCancelacion: 'Lluvia' })
+    const resultado = await app.inject({ method: 'POST', url: `/api/partidos/${id}/resultado`, payload: { golesLocal: 1, golesVisitante: 0 }, headers: conCookie(tokenDelegadoA) })
+    expect(resultado.statusCode).toBe(400)
+  })
+
   it('DELEGADO de otro equipo no gestiona (403)', async () => {
     const c = await app.inject({ method: 'POST', url: '/api/partidos', payload: { tipo: 'AMISTOSO', equipoLocalId: equipoA.id, equipoVisitanteId: equipoB.id, fechaHora: '2027-04-01T15:00:00Z' }, headers: conCookie(tokenDelegadoA) })
     const id = c.json().data.id

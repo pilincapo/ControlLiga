@@ -9,6 +9,7 @@ import { auditar } from '../auth/auditoria.js'
 import { transicionValidaTorneo } from '../torneos/estados.js'
 import { EstadoParticipacion, EstadoEquipoJugador } from '../generated/prisma/enums.js'
 import type { Prisma } from '../generated/prisma/client.js'
+import { esSlugValido, slugDesdeNombre } from '../slug.js'
 
 interface CrearTorneoBody {
   organizacionId: string
@@ -26,6 +27,15 @@ interface ModificarTorneoBody {
   reglas?: string
   visiblePublico?: boolean
   configuracionPublica?: unknown
+  slug?: string
+}
+
+async function siguienteSlug(prisma: ReturnType<typeof getPrisma>, nombre: string): Promise<string> {
+  const base = slugDesdeNombre(nombre)
+  for (let numero = 1; ; numero++) {
+    const slug = numero === 1 ? base : `${base}-${numero}`
+    if (!(await prisma.torneo.findUnique({ where: { slug }, select: { id: true } }))) return slug
+  }
 }
 
 interface CambiarEstadoBody {
@@ -121,6 +131,7 @@ export async function torneosRoutes(app: FastifyInstance): Promise<void> {
       data: {
         organizacionId: body.organizacionId,
         nombre,
+        slug: await siguienteSlug(prisma, nombre),
         descripcion: body.descripcion?.trim() || null,
         logoUrl: body.logoUrl?.trim() || null,
         reglas: body.reglas?.trim() || null,
@@ -148,7 +159,7 @@ export async function torneosRoutes(app: FastifyInstance): Promise<void> {
     const torneo = await prisma.torneo.findUnique({
       where: { id },
       include: {
-        organizacion: { select: { id: true, nombre: true } },
+        organizacion: { select: { id: true, nombre: true, slug: true, zonaHoraria: true } },
         temporadas: {
           orderBy: { fechaInicio: 'asc' },
           select: {
@@ -183,9 +194,15 @@ export async function torneosRoutes(app: FastifyInstance): Promise<void> {
     if (body.configuracionPublica !== undefined && !validarConfiguracionPublica(body.configuracionPublica)) {
       throw badRequest('La configuración pública no es válida')
     }
-    const torneo = await prisma.torneo.findUnique({ where: { id }, select: { id: true } })
+    if (body.slug !== undefined && !esSlugValido(body.slug)) throw badRequest('El slug no es válido')
+    const torneo = await prisma.torneo.findUnique({ where: { id }, select: { id: true, visiblePublico: true } })
     if (!torneo) {
       throw noEncontrado('Torneo')
+    }
+    if (body.slug !== undefined && torneo.visiblePublico) throw conflicto('slug_bloqueado', 'No se puede cambiar el slug de un torneo público')
+    if (body.slug !== undefined) {
+      const existente = await prisma.torneo.findUnique({ where: { slug: body.slug }, select: { id: true } })
+      if (existente && existente.id !== id) throw conflicto('slug_ocupado', 'El slug ya está en uso')
     }
     const cambios = await prisma.torneo.update({
       where: { id },
@@ -194,6 +211,7 @@ export async function torneosRoutes(app: FastifyInstance): Promise<void> {
         descripcion: body.descripcion !== undefined ? body.descripcion.trim() || null : undefined,
         logoUrl: body.logoUrl !== undefined ? body.logoUrl.trim() || null : undefined,
         reglas: body.reglas !== undefined ? body.reglas.trim() || null : undefined,
+        slug: body.slug,
         visiblePublico: body.visiblePublico,
         configuracionPublica: body.configuracionPublica !== undefined ? (body.configuracionPublica as never) : undefined,
       },

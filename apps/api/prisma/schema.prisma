@@ -172,6 +172,7 @@ enum EstadoPartido {
   FINALIZADO
   SUSPENDIDO
   APLAZADO
+  CANCELADO
 }
 
 enum TipoFormacion {
@@ -465,6 +466,8 @@ model Organizacion {
   id            String       @id @default(uuid()) @db.Uuid
   nombre        String
   descripcion   String?
+  slug          String?      @unique
+  zonaHoraria   String       @default("America/Argentina/Buenos_Aires")
   torneos       Torneo[]
   rolesUsuarios RolUsuario[]
   createdAt     DateTime     @default(now())
@@ -481,6 +484,7 @@ model Torneo {
   descripcion          String?
   logoUrl              String?
   reglas               String?
+  slug                 String?      @unique
   estado               EstadoTorneo          @default(BORRADOR)
   visiblePublico       Boolean               @default(false)
   configuracionPublica Json?
@@ -888,6 +892,7 @@ model Partido {
   golesLocalReglamentario Int?
   golesVisitanteReglamentario Int?
   observaciones       String?
+  motivoCancelacion   String?
   convocatorias       Convocatoria[]
   formaciones         Formacion[]
   formacionInstancias FormacionInstancia[]

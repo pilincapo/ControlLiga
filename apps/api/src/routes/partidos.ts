@@ -38,6 +38,7 @@ interface ModificarBody {
 
 interface CambiarEstadoBody {
   estado: string
+  motivoCancelacion?: string
 }
 
 interface GolesBody {
@@ -227,8 +228,9 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
     const auth = getAuth(request)
     const { id } = request.params as { id: string }
     const body = request.body as CambiarEstadoBody
+    const motivoCancelacion = body.motivoCancelacion?.trim()
     const prisma = getPrisma()
-    const estados = ['PROGRAMADO','EN_CURSO','FINALIZADO','SUSPENDIDO','APLAZADO']
+    const estados = ['PROGRAMADO','EN_CURSO','FINALIZADO','SUSPENDIDO','APLAZADO','CANCELADO']
     if (!estados.includes(body.estado)) throw badRequest('Estado inválido')
     const p = await prisma.partido.findUnique({ where: { id }, select: { id: true, estado: true, golesLocal: true, golesVisitante: true, tipo: true, torneoId: true, equipoResponsableId: true, equipoLocalId: true } })
     if (!p) throw noEncontrado('Partido')
@@ -236,13 +238,20 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
     if (p.estado === body.estado) throw badRequest('El partido ya está en ese estado')
     if (p.estado === 'FINALIZADO') throw conflicto('partido_finalizado', 'Un partido finalizado no se puede reabrir')
     if (!transicionValida(p.estado, body.estado as EstadoPartido)) throw conflicto('transicion_invalida', `No se puede pasar de ${p.estado} a ${body.estado}`)
+    if (body.estado === 'CANCELADO' && !motivoCancelacion) throw badRequest('El motivo de cancelación es obligatorio')
     if (body.estado === 'FINALIZADO' && (p.golesLocal == null || p.golesVisitante == null || p.golesLocal < 0 || p.golesVisitante < 0)) {
       throw badRequest('El resultado (goles) debe estar cargado antes de finalizar')
     }
     if (body.estado === 'FINALIZADO' && !(await validarGoles(prisma, p.id, p.golesLocal, p.golesVisitante))) throw badRequest('Los goles oficiales no coinciden con eventos GOL no anulados')
-    const actualizado = await prisma.partido.update({ where: { id }, data: { estado: body.estado as EstadoPartido }, select: { id: true, estado: true } })
+    const actualizado = await prisma.partido.update({
+      where: { id },
+      data: body.estado === 'CANCELADO'
+        ? { estado: 'CANCELADO' as EstadoPartido, golesLocal: null, golesVisitante: null, golesLocalReglamentario: null, golesVisitanteReglamentario: null, motivoCancelacion }
+        : { estado: body.estado as EstadoPartido },
+      select: { id: true, estado: true, golesLocal: true, golesVisitante: true, motivoCancelacion: true },
+    })
     if (actualizado.estado === 'FINALIZADO') await actualizarLlavePorPartidoFinalizado(prisma, id)
-    await auditar(prisma, { entidad: 'Partido', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { cambioDeEstado: { de: p.estado, a: body.estado } } })
+    await auditar(prisma, { entidad: 'Partido', entidadId: id, accion: 'UPDATE', usuarioId: auth.usuarioId, cambios: { cambioDeEstado: { de: p.estado, a: body.estado }, ...(body.estado === 'CANCELADO' ? { motivoCancelacion, resultadoAnterior: { golesLocal: p.golesLocal, golesVisitante: p.golesVisitante } } : {}) } })
     return { data: actualizado }
   })
 
@@ -256,7 +265,7 @@ export async function partidosRoutes(app: FastifyInstance): Promise<void> {
     }
     const p = await prisma.partido.findUnique({ where: { id }, select: { id: true, estado: true, tipo: true, torneoId: true, equipoResponsableId: true, equipoLocalId: true, ordenSerie: true, llaveCompetencia: { select: { id: true, rondaEliminatoria: { select: { permiteAlargue: true, formatoSerie: true } }, partidos: { select: { id: true, ordenSerie: true, golesLocal: true, golesVisitante: true }, orderBy: { ordenSerie: 'asc' } } } } } })
     if (!p) throw noEncontrado('Partido')
-    if (p.estado === 'FINALIZADO') throw badRequest('El partido ya está finalizado')
+    if (p.estado === 'FINALIZADO' || p.estado === 'CANCELADO') throw badRequest('El partido no admite resultados')
     if (!(await puedeGestionar(prisma, auth, p))) throw prohibido('No tenés permiso para cargar el resultado')
     const nuevoEstado = p.estado === 'EN_CURSO' ? 'FINALIZADO' : undefined
     const reglamentario = body.golesLocalReglamentario !== undefined || body.golesVisitanteReglamentario !== undefined

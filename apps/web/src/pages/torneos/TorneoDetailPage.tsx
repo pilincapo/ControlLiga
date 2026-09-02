@@ -105,6 +105,7 @@ export default function TorneoDetailPage() {
           descripcion: (datos.descripcion as string) || null,
           reglas: (datos.reglas as string) || null,
           logoUrl: (datos.logoUrl as string) || null,
+          slug: (datos.slug as string) || undefined,
           visiblePublico: false,
         }),
       })
@@ -185,6 +186,10 @@ export default function TorneoDetailPage() {
             <div className="campo">
               <label htmlFor="t-logo">Logo URL</label>
               <input id="t-logo" name="logoUrl" defaultValue={torneo.logoUrl ?? ''} />
+            </div>
+            <div className="campo">
+              <label htmlFor="t-slug">Slug público</label>
+              <input id="t-slug" name="slug" defaultValue={torneo.slug ?? ''} disabled={torneo.visiblePublico} pattern="[a-z0-9]+(-[a-z0-9]+)*" />
             </div>
             <button className="boton boton-primario" type="submit">
               Guardar
